@@ -1,0 +1,19 @@
+#some fitting parameters of the physical sputtering yield with different energies.
+#first column: incident energy, in Unit:eV
+#second column: f
+#third column: b
+#fourth column: c
+#fifth column: Y(E_0, 0)
+#sixth column: E_sp(in unit eV)
+#:seventh column: (theta_0)^*
+#:eighth column: theta_0m
+
+250  4.2860  2.9471  0.7250  2.34e-5 1.00    93.62   44.77
+270  2.6708  1.6256  0.9398  8.63e-5 1.00    93.48   54.23
+300  2.0195  1.1760  0.9927  2.08e-4 1.00    93.30   56.36
+350  1.9721  1.1169  0.9762  5.98e-4 1.00    93.06   57.35
+400  1.6044  0.8545  1.0054  1.11e-3 1.00    92.86   59.65
+500  1.3909  0.6348  1.0216  2.20e-3 1.00    92.56   64.51
+600  0.9409  0.3319  1.0655  3.39e-3 1.00    92.34   70.32
+700  1.1523  0.3351  1.0523  4.22e-3 1.00    92.16   73.95
+1000 1.1544  0.1901  1.0824  6.55e-3 1.00    91.81   80.04

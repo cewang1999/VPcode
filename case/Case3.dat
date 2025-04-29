@@ -1,0 +1,10 @@
+# Const number
+
+L           55 
+n           3.2e19  
+T           50  
+sigma       10 
+Nx          101  
+Nv          100   
+theta       90
+SolverType  DS

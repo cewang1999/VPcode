@@ -1,0 +1,17 @@
+# VESPA import numbers
+# first  : species name
+# second : mass
+# third  : charge 
+# fourth : impact angle
+# fifth  : method1 Bohdansky or Eckstein
+# sixth  : method2 Yamamura  or Eckstein
+
+e-     1       -1   0    Bohdansky  Yamamura
+H+     1836    1    45   Bohdansky  Yamamura
+D+     3672    1    45   Bohdansky  Yamamura
+He2+   7344    2    45   Bohdansky  Yamamura
+C6+    22032   6    45
+Li3+   12852   3    45   Bohdansky  Yamamura
+Ne10+  36720   10   45   Bohdansky  Yamamura
+Ar18+  73440   18   45   Bohdansky  Yamamura
+W37+   335988  37   45   Eckstein   Eckstein          

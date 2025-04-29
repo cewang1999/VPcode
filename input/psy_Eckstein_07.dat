@@ -1,0 +1,33 @@
+#reference: Sputtering Yields, Wolfgang Eckstein, 2007
+##the fitting formula of sputtering yield have some errors which was corrected at ftp://ftp.rzg.mpg.de/pub/ipp/eckstein/rep05/errors_chapter4.pdf
+##this corrected file can also be found on:https://drive.google.com/file/d/11pF82xcbjxDqihPpzr35OjzNzaTHaMYB/view?usp=sharing
+##these fitting parameters are used for computing Sputtered energy coefficient
+#fitting parameters for Eckstein physical sputtering yield.
+#the fitting formular is valid when: for low mass ions, the maximum incident energy is 20keV
+##for heavy ions, the maximum incident energy is 200keV. 
+#for each material, and each incident species, the fitting parameters for different incident species are different.
+##:first column: incident species name;
+##:second column: target species name;
+##:third column: lambda;
+##:fourth column: q;
+##:fifth column: mu;
+##:sixth column: the threshold energy;
+##:seventh column: the energy at Lindhard screening length(\varepsilon)
+##:eighth column: the surface binding energy(in unit eV) 
+##:ninth column: E_sb/gamma
+##:tenth column: max yield
+##:eleventh column: energy of max yield(in unit eV)
+##:twelfth column: angle of max yield
+
+H   W   1.0087  0.0075  1.2046  457.42  9.86986e3   8.68    399.36  0.1088  3.891e4 87.22
+D   W   0.3583  0.0183  1.4410  228.84  9.92326e3   8.68    202.85  0.3878  6.918e4 87.14
+T   W   0.2870  0.0418  1.5802  153.884 9.97718e3   8.68    136.48  0.8940  8.710e4 87.02
+He3 W   0.2424  0.0884  1.2439  164.347 2.02666e4   8.68    136.48
+He4 W   0.1692  0.1151  1.7121  120.56  2.03728e4   8.68    104.13
+O   W   0.0777  1.8824  1.7536  44.214  9.19794e4   8.68    29.46
+Ne  W   0.0828  2.5520  1.9534  38.639  1.19107e5   8.68    24.35
+Ar  W   0.2113  5.9479  2.3857  27.0503 2.46646e5   8.68    14.80
+Kr  W   0.1747  13.6917 2.5161  34.7592 6.36677e5   8.68    10.09
+W   W   2.2697  18.601  3.1273  24.989  1.99860e6   8.68    8.68
+He4 Ni  0.2024  0.3704  1.9128  25.3764 6.04409e3   4.46    18.67
+Cu  Cu  2.6044  14.5469 2.5577  10.7777 2.24619e5   3.52    3.52
