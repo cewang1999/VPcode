@@ -190,7 +190,7 @@ void OUTPUT::diagOutput(World &world, vector<Species> &species, APSolver &solver
         f_diag << ",ElectricEnergy" << endl;
     }
 
-    f_diag << world.getTs() * world.getDt() / sqrt(Const::m_H) * Const::tau_i;
+    f_diag << world.getTs() * world.getDt() / sqrt(Const::m_H) ;//* Const::tau_i;
 
     for (Species &sp : species)
     {

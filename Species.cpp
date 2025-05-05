@@ -155,7 +155,7 @@ double Species::getPaticleflux()
         }
     }
 
-    return flux * n_elm * V_Te * sin_theta; // 含修正 归一化系数：(n_e*v_Te)
+    return flux *sqrt(Const::m_H);//* n_elm * V_Te * sin_theta; // 含修正 归一化系数：(n_e*v_Te)
 }
 
 double Species::getEnergyflux()
