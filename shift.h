@@ -4,6 +4,8 @@
 #include "World.h"
 #include "Species.h"
 #include "APSolver.h"
+#include "FluxCalculator.h"
+#include <memory>
 
 class APSolver;
 
@@ -18,14 +20,19 @@ class Shift
 protected:
     Species &sp;
     World &world;
+    unique_ptr<FluxCalculator> flux_calc;
 
 public:
-    Shift(Species &sp) : sp(sp), world(sp.getWorld()) {}
+    Shift(Species &sp) : sp(sp), world(sp.getWorld())
+    {
+        flux_calc = std::make_unique<PFC3FLUX>();
+    }
     ~Shift() {}
 };
 
 class ShiftX : protected Shift
 {
+public:
     ShiftX(Species &sp) : Shift(sp), flux(world.ni + 1, world.nj)
     {
         ni = world.ni + 1;
@@ -43,7 +50,7 @@ private:
     int ni;
     int nj;
 
-    // 逻辑链接：仅限X方向的链接
+    // 逻辑链接：仅限X方向的链接,链接的左右cell
     vec2<int> leftCell(const int i, const int j)
     {
         vec2<int> left;
@@ -96,6 +103,20 @@ private:
     {
         for (int n = 0; n < count; n++)
             rights[n] = rightNCell(join[0], join[1], n);
+    }
+
+    // 逻辑链接：仅限X方向的链接,cell的左右join
+    int cell_Join(const int cellx, const int dir = 0)
+    {
+        if (dir == 0)
+            return world.xIdx(cellx);
+        return world.xIdx(cellx + 1);
+    }
+
+    int findCell(double X) const
+    {
+        int i_log = (int)std::floor((X - world.getXmin()) / world.getDx());
+        return world.xIdx(i_log);
     }
 
     void collectStencil(double v, vec2<int> join, vector<double> &stencil);
