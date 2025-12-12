@@ -12,7 +12,7 @@ void ShiftX::computeFlux(int i, int j)
 {
     vec2<int> L, R, join;
     L = leftCell(i, j), R = rightCell(i, j);
-    double *v = world.getVarray();
+    double *v = world.getVarray(), *x = world.getXarray();
     double velocity = 0.5 * (v[L[1]] + v[R[1]]);
 
     std::vector<double> stencil;
@@ -28,7 +28,7 @@ void ShiftX::computeFlux(int i, int j)
         if (velocity > 0)
         {
             int Ci = L[0];
-            double xRi = world.X(Ci) + 0.5 * world.getDx();
+            double xRi = x[Ci] + 0.5 * world.getDx();
             double X = xRi - world.getDt() * velocity;
             int Cj = findCell(X);
             int jrx = cell_Join(Cj, 1);
@@ -36,7 +36,7 @@ void ShiftX::computeFlux(int i, int j)
             collectStencil(velocity, join, stencil);
             double xRj = world.X(Cj) + 0.5 * world.getDx();
             alpha = xRj - X;
-            sum = sumFrmk2J(Ci + 1, Cj - 1, j);
+            sum = sumFrmk2J(world.xIdx(Cj + 1), Ci, j);
         }
         flux[i][j] = flux_calc->computeFluxHighOrder(stencil, velocity, world.getDx(), world.getDt(), alpha, maxlimiter[j], sum);
     }

@@ -115,8 +115,8 @@ public:
 	inline double &X(int i) { return x[xIdx(i)]; }
 	inline double &V(int j) { return v[vIdx(j)]; }
 
-	double* getVarray(){return v.data();}
-	double* getXarray(){return x.data();}
+	double *getVarray() { return v.data(); }
+	double *getXarray() { return x.data(); }
 
 	/*sets time step and number of time steps*/
 	void setTime(double dt, int num_ts)
@@ -166,7 +166,7 @@ public:
 
 	const int ni, nj; // number of nodes
 	int ni_total, nj_total;
-	int nghosts = 1;
+	int nghosts = 3;
 
 	static void printMySelf();
 	static void loadTime(string no);

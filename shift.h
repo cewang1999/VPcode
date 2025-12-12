@@ -59,13 +59,13 @@ private:
     vec2<int> leftCell(const int i, const int j)
     {
         vec2<int> left;
-        left[0] -= 1, left[1] = j;
+        left[0] = i - 1, left[1] = j;
         return world.CellIndex(left);
     }
     vec2<int> rightCell(const int i, const int j)
     {
         vec2<int> right;
-        right[0] -= 0, right[1] = j;
+        right[0] = i, right[1] = j;
         return world.CellIndex(right);
     }
     vec2<int> leftNCell(const int i, const int j, const int n)
@@ -77,7 +77,7 @@ private:
             return left;
         }
 
-        left[0] -= n, left[1] = j;
+        left[0] = i - n - 1, left[1] = j;
 
         if (left[0] < -world.nghosts)
             cout << " extend min of L" << endl;
@@ -92,7 +92,7 @@ private:
             right = rightCell(i, j);
             return right;
         }
-        right[0] += n - 1, right[1] = j;
+        right[0] = i + n, right[1] = j;
 
         if (right[0] >= world.ni + world.nghosts)
             cout << " extend max of L" << endl;
@@ -132,7 +132,8 @@ private:
         double sum = 0;
         int jdx = world.vIdx(j);
         for (int i = ck; i <= cj; ++i)
-            sum += f(i, j);
+            sum += f(i, jdx);
+        return sum;
     }
 };
 
