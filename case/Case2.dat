@@ -4,7 +4,9 @@ L           55
 n           3.2e19  
 T           150  
 sigma       10
-Nx          101  
-Nv          100   
+Nx          128
+Nv          128  
 theta       90
-SolverType  DS
+SolverType  AP
+dt          0.02
+num_ts      4000
