@@ -13,68 +13,92 @@ enum ShiftDirection
     Y
 };
 
-class shift
+class Shift
 {
-public:
-    shift(ShiftDirection Direction, Species &fs, World &world);
-
-    /*沿 X 方向更新二维分布函数 fs*/
-    void Upgrade_fs_X();
-
-    /*沿 Y 方向更新二维分布函数 fs*/
-    void Upgrade_fs_Y(APSolver &solver);
-
-    /*x方向插值*/
-    double interpx(double x);
-
-    /*v方向插值*/
-    double interpv(double v);
-
-    /*x方向更新*/
-    void upgradeX();
-
-    /*v方向更新*/
-    void upgradeV(APSolver &solver);
-
 protected:
-    Species &spe; // 粒子种类
-    dvector f;    // 保存某行或某列分布函数 f
-    dvectorI cell;
-    dvector alpha;
-    ShiftDirection Direction;
+    Species &sp;
     World &world;
 
-    /*initialized cell and alpha*/
-    void Buildvector();
+public:
+    Shift(Species &sp) : sp(sp), world(sp.getWorld()) {}
+    ~Shift() {}
+};
 
-    /* 选取某 i 行或某 j 列向量, 行 m = 1 ，列 m = 2 */
-    dvector vecF(int i);
+class ShiftX : protected Shift
+{
+    ShiftX(Species &sp) : Shift(sp), flux(world.ni + 1, world.nj)
+    {
+        ni = world.ni + 1;
+        nj = world.nj;
+    }
+    ~ShiftX() {}
 
-    /*find cell number of character solution*/
-    void findcell(double v);
+    void fillGhostCells();          // 填充 X 方向幽灵网格，call to Specie 函数
+    void computeFlux();             // 计算 X 方向 Flux
+    void computeFlux(int i, int j); // 计算 (i,j) 处 Flux
+    void updateInteriorCells();     // 填充 X 方向所有网格
+private:
+    // flux的内部存储与join连接，这里的flux垂直于x ｜——｜——｜
+    Field flux;
+    int ni;
+    int nj;
 
-    /*find cell number of character solution*/
-    void Vfindcell(double v);
+    // 逻辑链接：仅限X方向的链接
+    vec2<int> leftCell(const int i, const int j)
+    {
+        vec2<int> left;
+        left[0] -= 1, left[1] = j;
+        return world.CellIndex(left);
+    }
+    vec2<int> rightCell(const int i, const int j)
+    {
+        vec2<int> right;
+        right[0] -= 0, right[1] = j;
+        return world.CellIndex(right);
+    }
+    vec2<int> leftNCell(const int i, const int j, const int n)
+    {
+        vec2<int> left;
+        if (n == 0)
+        {
+            left = leftCell(i, j);
+            return left;
+        }
 
-    /*估算边界两点，一阶精度*/
-    double approx(int i);
+        left[0] -= n, left[1] = j;
 
-    /*斜率矫正，防止出现负值*/
-    dvector SlopeCorrectorPlus();
+        if (left[0] < -world.nghosts)
+            cout << " extend min of L" << endl;
 
-    dvector SlopeCorrectorMinus();
+        return world.CellIndex(left);
+    }
+    vec2<int> rightNCell(const int i, const int j, const int n)
+    {
+        vec2<int> right;
+        if (n == 0)
+        {
+            right = rightCell(i, j);
+            return right;
+        }
+        right[0] += n - 1, right[1] = j;
 
-    /*计算 f[i] 两边的通量*/
-    dvector getFlux(double v);
+        if (right[0] >= world.ni + world.nghosts)
+            cout << " extend max of L" << endl;
 
-    /*计算 f[i] 两边的通量*/
-    dvector VgetFlux(double v);
+        return world.CellIndex(right);
+    }
+    void getleftCells(vec2<int> join, const int count, vector<vec2<int>> &lefts)
+    {
+        for (int n = 0; n < count; n++)
+            lefts[n] = leftNCell(join[0], join[1], n);
+    }
+    void getrightCells(vec2<int> join, const int count, vector<vec2<int>> &rights)
+    {
+        for (int n = 0; n < count; n++)
+            rights[n] = rightNCell(join[0], join[1], n);
+    }
 
-    /*更新分布函数 f*/
-    dvector Upgrade_f(double v);
-
-    /*更新分布函数 f*/
-    dvector VUpgrade_f(double v);
+    void collectStencil(double v, vec2<int> join, vector<double> &stencil);
 };
 
 #endif
