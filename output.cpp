@@ -22,14 +22,14 @@ bool OUTPUT::output(const Field &f, const World &world, int step)
         return false;
     }
 
-    int ni = f.ni;
-    int nj = f.nj;
+    int ni = world.ni;
+    int nj = world.nj;
 
     for (int j = 0; j < nj; j++)
     {
         for (int i = 0; i < ni; i++)
         {
-            out << f(i, j);
+            out << f(world.xIdx(i), world.vIdx(j));
 
             if (i < ni - 1)
             {
@@ -159,7 +159,7 @@ void OUTPUT::screenOutput(World &world, vector<Species> &species, APSolver &solv
     cout << left << setw(7) << "time step:" << right << setw(6) << world.getTs()
          << left << setw(7) << "    time:" << right << setw(8) << world.getInsatance()->getRunTime();
     for (Species &sp : species)
-        cout << left << setw(7) <<"    "<< sp.name << ":" << right << setw(8) << sp.gettotalKE();
+        cout << left << setw(7) << "    " << sp.name << ":" << right << setw(8) << sp.gettotalKE();
     cout << left << setw(7) << "    ELectric energy:"
          << right << setw(7) << solver.getElectricEnergy();
     cout << endl;
@@ -190,7 +190,7 @@ void OUTPUT::diagOutput(World &world, vector<Species> &species, APSolver &solver
         f_diag << ",ElectricEnergy" << endl;
     }
 
-    f_diag << world.getTs() * world.getDt() ;// sqrt(Const::m_H) ;//* Const::tau_i;
+    f_diag << world.getTs() * world.getDt(); // sqrt(Const::m_H) ;//* Const::tau_i;
 
     for (Species &sp : species)
     {
