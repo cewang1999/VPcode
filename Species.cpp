@@ -155,7 +155,7 @@ double Species::getPaticleflux()
         }
     }
 
-    return flux *sqrt(Const::m_H);//* n_elm * V_Te * sin_theta; // 含修正 归一化系数：(n_e*v_Te)
+    return flux * sqrt(mass); //* n_elm * V_Te * sin_theta; // 含修正 归一化系数：(n_e*v_Te)
 }
 
 double Species::getEnergyflux()
@@ -186,12 +186,12 @@ double Species::getEnergyflux()
         {
             double v = world.V(j);
 
-            flux += 0.5 * mass * (f[N - 1][j] * v * v * v) * dv;
-            flux += f[N - 1][j] * v * dv;
+            flux += 0.5 * mass * (f[N - 1][j] * v * v * v) * dv * sqrt(mass);
+            flux += f[N - 1][j] * v * dv * sqrt(mass);
         }
     }
 
-    return flux * n_elm * T_elm * QE * V_Te * sin_theta; // 含修正 归一化系数：(n_e*T_ELM*v_Te)
+    return flux; //* n_elm * T_elm * QE * V_Te * sin_theta; // 含修正 归一化系数：(n_e*T_ELM*v_Te)
 }
 
 double Species::getNumdensity()

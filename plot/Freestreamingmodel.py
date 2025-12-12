@@ -6,10 +6,14 @@ import matplotlib.pyplot as plt
 
 
 class Setting:
-    def __init__(self, electronTime=True, simpleFSM=True):
+    def __init__(
+        self, electronTime=True, simpleFSM=True, ThermalSpeed=True, ParticleFlux=True
+    ):
         self.sigma = 10
         self.electronTime = electronTime
         self.simpleFSM = simpleFSM
+        self.ThermalSpeed = ThermalSpeed
+        self.ParticleFlux = ParticleFlux
 
 
 class Ion:
@@ -35,11 +39,35 @@ class FSM:
         sigma = self.setting.sigma
 
         if self.setting.simpleFSM:
-            flux = sigma / (t**2) * np.exp(-0.5 * (sigma**2) / (t**2))
+            if self.setting.ParticleFlux:
+                flux = sigma / (t**2) * np.exp(-0.5 * (sigma**2) / (t**2))
+            else:
+                flux = (
+                    sigma
+                    / (t**2)
+                    * np.exp(-0.5 * (sigma**2) / (t**2))
+                    * (sigma**2 / (t**2) + 1)
+                )
         else:
-            flux = (
-                sigma * t / (1 + t**2) ** (3 / 2) * np.exp(-0.5 * sigma**2 / (1 + t**2))
-            )
+            if self.setting.ParticleFlux:
+                flux = (
+                    sigma
+                    * t
+                    / (1 + t**2) ** (3 / 2)
+                    * np.exp(-0.5 * sigma**2 / (1 + t**2))
+                )
+            else:
+                flux = (
+                    sigma
+                    * t
+                    / (1 + t**2) ** (3 / 2)
+                    * np.exp(-0.5 * sigma**2 / (1 + t**2))
+                ) * (sigma**2 * t**2 / (1 + t**2) ** 2 + 1.5 / (1 + t**2) + 1)
+
+        if self.setting.ThermalSpeed:
+            flux = flux * np.sqrt(2 / self.ions.mass)
+        else:
+            flux = flux
 
         return flux
 
@@ -64,22 +92,28 @@ class FSM:
         t = self.TimeTransfer(time)
 
         plt.figure(figsize=(8, 4))
-        plt.ylabel(r"Flux($n_ec_s$)")
 
         if self.setting.electronTime:
             plt.xlabel(r"Time/$\tau_e$")
         else:
             plt.xlabel(r"Time/$\tau_H^+$")
 
+        if self.setting.ThermalSpeed:
+            plt.ylabel(r"Flux($n_ev^{th}_e$)")
+        else:
+            plt.ylabel(r"Flux($n_ec_s$)")
+
         plt.plot(t, f, label="f(t)", color="blue")
-        plt.xlim(0, 4)
+        # plt.xlim(0, 4)
         plt.title("Electron Transition Flux vs Time")
         plt.grid(True)
         plt.show()
 
 
 if __name__ == "__main__":
-    fsm = FSM(Setting(True, False), "Human-defined Model", Ion("H+", 100, 1))
+    fsm = FSM(
+        Setting(True, False, True, True), "Human-defined Model", Ion("H+", 1836, 1)
+    )
 
     time = np.linspace(0.01, 40, 1000)
 

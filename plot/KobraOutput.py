@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 class Kobra:
@@ -36,8 +37,11 @@ class Kobra:
 
 
 if __name__ == "__main__":
-    k = Kobra("/Users/wangce/Vlasov/VPcode/plot/flux.out")  # 第一行就是数据，无需跳过
+    k = Kobra("/Users/wangce/Vlasov/VPcode/plot/flux3.out")  # 第一行就是数据，无需跳过
     time_data = k.get_column(0)  # 获取时间列
     exp_data = k.get_column(1)  # 获取实验数据列
+    exp_data2 = k.get_column(3)  # 获取实验数据列
+    plt.plot(time_data, exp_data, time_data, exp_data2)
+    plt.show()
     print("时间列前5个值:", time_data[:5])
     print("实验列前5个值:", exp_data[:5])
