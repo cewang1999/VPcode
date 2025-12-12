@@ -11,13 +11,13 @@
 #include <unordered_map>
 
 double World::dt = 0.0;
-int World::num_ts = 0; 
+int World::num_ts = 0;
 
 using namespace Const;
 
 int main(int argc, char *argv[])
 {
-    string Case = "1";
+    string Case = "2";
     Const::readConst(Case);
     Const::printMyself();
     World::printMySelf();
@@ -26,12 +26,12 @@ int main(int argc, char *argv[])
     World world(Nx, Nv);
     world.setExtents(-1, 1, -6, 6);
     World world_D(Nx, Nv);
-    world_D.setExtents(-1, 1, -0.15, 0.15);
+    world_D.setExtents(-1, 1, -0.14, 0.14);
 
     vector<Species> species;
     species.reserve(2);
-    species.push_back(Species("e-", 100.00, world)); // 名称 组分
-    species.push_back(Species("H+", 100.00, world_D));
+    species.push_back(Species("e-", 1.00, world)); // 名称 组分
+    species.push_back(Species("H+", 1.00, world_D));
 
     Species &e = species[0];
     Species &D = species[1];
@@ -78,7 +78,7 @@ int main(int argc, char *argv[])
         {
             OUTPUT::diagOutput(world, species, solver);
             // OUTPUT::output(D.f, world_D, world.getTs());
-            OUTPUT::output(e.f, world, world.getTs());
+            // OUTPUT::output(e.f, world, world.getTs());
             // OUTPUT::output(solver, world, world.getTs());
             // OUTPUT::output(species, world, world_H, world.getTs());
         }
