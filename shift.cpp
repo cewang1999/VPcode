@@ -1,4 +1,5 @@
 #include "shift.h"
+#include <cmath>
 
 void ShiftX::computeFlux()
 {
@@ -11,7 +12,8 @@ void ShiftX::computeFlux(int i, int j)
 {
     vec2<int> L, R, join;
     L = leftCell(i, j), R = rightCell(i, j);
-    double velocity = 0.5 * (world.V(L[1]) + world.V(R[1]));
+    double *v = world.getVarray();
+    double velocity = 0.5 * (v[L[1]] + v[R[1]]);
 
     std::vector<double> stencil;
 
@@ -34,15 +36,16 @@ void ShiftX::computeFlux(int i, int j)
             collectStencil(velocity, join, stencil);
             double xRj = world.X(Cj) + 0.5 * world.getDx();
             alpha = xRj - X;
+            sum = sumFrmk2J(Ci + 1, Cj - 1, j);
         }
-        flux[i][j] = flux_calc->computeFluxHighOrder(stencil, velocity, world.getDx(), world.getDt(), alpha, 0, sum);
+        flux[i][j] = flux_calc->computeFluxHighOrder(stencil, velocity, world.getDx(), world.getDt(), alpha, maxlimiter[j], sum);
     }
 }
 
 void ShiftX::collectStencil(double v, vec2<int> join, vector<double> &stencil)
 {
-    int left_size = 1;  // flux_calculator->getLeftStencilSize();
-    int right_size = 1; // flux_calculator->getRightStencilSize();
+    int left_size = 2;  // flux_calculator->getLeftStencilSize();
+    int right_size = 2; // flux_calculator->getRightStencilSize();
 
     Field &f = sp.f;
 
@@ -84,4 +87,41 @@ void ShiftX::collectStencil(double v, vec2<int> join, vector<double> &stencil)
         for (vec2<int> cell_id : right_cells)
             stencil.push_back(f(cell_id[0], cell_id[1]));
     }
+}
+
+void ShiftX::computMaxLimiter()
+{
+    int _ni = world.ni, _nj = world.nj;
+    Field &f = sp.f;
+    for (int j = 0; j < _nj; ++j)
+    {
+        double max_val = -1e100;
+        for (int i = 0; i < _ni; ++i)
+            max_val = std::max(max_val, sp.F(i, j));
+
+        maxlimiter[j] = max_val;
+    }
+}
+
+void ShiftX::updateInteriorCells()
+{
+    int _ni = world.ni, _nj = world.nj;
+    double dx = world.getDx(), dt = world.getDt();
+
+    for (int j = 0; j < _nj; ++j)
+        for (int i = 0; i < _ni; ++i)
+        {
+            double div_x = (flux[i + 1][j] - flux[i][j]) / dx;
+            sp.F(i, j) -= dt * div_x;
+            sp.F(i, j) = fmax(sp.F(i, j), 0);
+        }
+}
+
+void ShiftX::Xadvection()
+{
+    if (flux_calc->isHighOrder())
+        computMaxLimiter();
+    fillGhostCells();
+    computeFlux();
+    updateInteriorCells();
 }

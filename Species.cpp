@@ -328,6 +328,72 @@ double Species::ComputeErosionRate()
     return rate;
 }
 
+// 边界设置
+void Species::fillGhostCellsX()
+{
+    fillGhostBoundary(0, 0, PERIODIC); // X-左
+    fillGhostBoundary(0, 1, PERIODIC); // X-右
+}
+
+void Species::fillGhostCellsV()
+{
+    fillGhostBoundary(1, 0, PERIODIC); // X-左
+    fillGhostBoundary(1, 1, PERIODIC); // X-右
+}
+
+void Species::fillGhostBoundary(int dir, int side, const BoundaryType BT)
+{
+    // 获取参数
+    int n_para = (dir == 0) ? world.nj : world.ni;
+    int n_main = (dir == 0) ? world.ni : world.nj;
+
+    for (int j = 0; j < n_para; j++)
+    {
+
+        for (int layer = 1; layer <= world.nghosts; layer++)
+        {
+
+            vec2<int> ghost_idx, interior_idx;
+
+            // 计算索引（通用逻辑）
+            if (dir == 0)
+            { // X 方向
+
+                int i_ghost = (side == 0) ? -layer : n_main + layer - 1;
+                int i_interior = (side == 0) ? layer - 1 : n_main - layer;
+                ghost_idx = world.CellIndex(i_ghost, j);
+                interior_idx = world.CellIndex(i_interior, j);
+            }
+            else
+            { // V 方向
+                int j_ghost = (side == 0) ? -layer : n_main + layer - 1;
+                int j_interior = (side == 0) ? layer - 1 : n_main - layer;
+                ghost_idx = world.CellIndex(j, j_ghost);
+                interior_idx = world.CellIndex(j, j_interior);
+            }
+
+            switch (BT)
+            {
+                // 周期需要特殊处理，从对面取值
+            case PERIODIC:
+            {
+                int opposite = (side == 0) ? n_main - layer : layer - 1;
+                vec2<int> opp_idx = (dir == 0) ? world.CellIndex(opposite, j) : world.CellIndex(j, opposite);
+                f[ghost_idx[0]][ghost_idx[1]] = f(opp_idx[0], opp_idx[1]);
+            }
+            break;
+
+            case NEUMANN:
+            {
+                int sign = (side == 0) ? -1 : 1;
+                F(ghost_idx) = F(interior_idx);
+            }
+            break;
+            }
+        }
+    }
+}
+
 PhysicalSputteringYield::PhysicalSputteringYield(const string &incident_species, const string &target_species, const string &form_type, const string &angular_type)
 {
     incident_species_name = incident_species;

@@ -98,6 +98,13 @@ public:
 
 extern string to_Part(std::string name);
 
+enum BoundaryType
+{
+    PERIODIC,
+    NEUMANN,
+    WALL
+};
+
 class Species
 {
 public:
@@ -211,6 +218,11 @@ public:
     }
 
     World &getWorld() { return world; }
+
+    void fillGhostCellsX();
+    void fillGhostCellsV();
+
+    void fillGhostBoundary(int dir, int side, const BoundaryType BT);
 
 protected:
     World &world;

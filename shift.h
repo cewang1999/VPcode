@@ -37,16 +37,21 @@ public:
     {
         ni = world.ni + 1;
         nj = world.nj;
+        maxlimiter.resize(nj, 0);
     }
     ~ShiftX() {}
 
-    void fillGhostCells();          // 填充 X 方向幽灵网格，call to Specie 函数
-    void computeFlux();             // 计算 X 方向 Flux
-    void computeFlux(int i, int j); // 计算 (i,j) 处 Flux
-    void updateInteriorCells();     // 填充 X 方向所有网格
+    void computMaxLimiter();
+    void fillGhostCells() { return sp.fillGhostCellsX(); } // 填充 X 方向幽灵网格，call to Specie 函数
+    void computeFlux();                                    // 计算 X 方向 Flux
+    void computeFlux(int i, int j);                        // 计算 (i,j) 处 Flux
+    void updateInteriorCells();                            // 填充 X 方向所有网格
+    void Xadvection();
+
 private:
     // flux的内部存储与join连接，这里的flux垂直于x ｜——｜——｜
     Field flux;
+    dvector maxlimiter;
     int ni;
     int nj;
 
@@ -109,17 +114,26 @@ private:
     int cell_Join(const int cellx, const int dir = 0)
     {
         if (dir == 0)
-            return world.xIdx(cellx);
-        return world.xIdx(cellx + 1);
+            return cellx;
+        return cellx + 1;
     }
 
     int findCell(double X) const
     {
         int i_log = (int)std::floor((X - world.getXmin()) / world.getDx());
-        return world.xIdx(i_log);
+        return i_log;
     }
 
     void collectStencil(double v, vec2<int> join, vector<double> &stencil);
+
+    double sumFrmk2J(int ck, int cj, int j) const
+    {
+        Field &f = sp.f;
+        double sum = 0;
+        int jdx = world.vIdx(j);
+        for (int i = ck; i <= cj; ++i)
+            sum += f(i, j);
+    }
 };
 
 #endif

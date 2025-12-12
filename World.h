@@ -115,6 +115,9 @@ public:
 	inline double &X(int i) { return x[xIdx(i)]; }
 	inline double &V(int j) { return v[vIdx(j)]; }
 
+	double* getVarray(){return v.data();}
+	double* getXarray(){return x.data();}
+
 	/*sets time step and number of time steps*/
 	void setTime(double dt, int num_ts)
 	{
