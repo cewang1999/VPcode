@@ -101,7 +101,7 @@ extern string to_Part(std::string name);
 class Species
 {
 public:
-    Species(string name, double pw, World &world) : name(name), pw(pw), f(world.ni, world.nj), PSY(nullptr),
+    Species(string name, double pw, World &world) : name(name), pw(pw), f(world.ni_total, world.nj_total), PSY(nullptr),
                                                     Maxwell(world.nj), world(world)
     {
         if (!Initialize())
@@ -115,7 +115,7 @@ public:
     }
 
     // 拷贝构造函数
-    Species(Species &&other) : name(other.name), pw(other.pw), f(other.world.ni, other.world.nj), PSY(nullptr),
+    Species(Species &&other) : name(other.name), pw(other.pw), f(other.world.ni_total, other.world.nj_total), PSY(nullptr),
                                Maxwell(other.world.nj), world(other.world)
     {
         if (!Initialize())
@@ -186,6 +186,31 @@ public:
     PhysicalSputteringYield *PSY;
     string method1;
     string method2;
+
+    // topo : Log -> memory
+    inline double F(int i, int j) const
+    {
+        int idx = world.xIdx(i), jdx = world.vIdx(j);
+        return f(idx, jdx);
+    }
+    inline double F(vec2<int> ij) const
+    {
+        vec2<int> ij_idx = world.CellIndex(ij);
+        return f(ij_idx[0], ij_idx[1]);
+    }
+
+    inline double &F(int i, int j)
+    {
+        int idx = world.xIdx(i), jdx = world.vIdx(j);
+        return f[idx][jdx];
+    }
+    inline double &F(vec2<int> ij)
+    {
+        vec2<int> ij_idx = world.CellIndex(ij);
+        return f[ij_idx[0]][ij_idx[1]];
+    }
+
+    World &getWorld() { return world; }
 
 protected:
     World &world;

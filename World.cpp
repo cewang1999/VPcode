@@ -187,6 +187,14 @@ void World::release()
 
 void World::setExtents(const double _xmin, const double _xmax, const double _vmin, const double _vmax)
 {
+	/*set n and m*/
+	ni_total = ni + 2 * nghosts;
+	nj_total = nj + 2 * nghosts;
+
+	/*store x and v*/
+	x.resize(ni_total, 0);
+	v.resize(nj_total, 0);
+
 	/*set origin and the opposite corner*/
 	xmin = _xmin;
 	xmax = _xmax;
@@ -194,24 +202,16 @@ void World::setExtents(const double _xmin, const double _xmax, const double _vmi
 	vmax = _vmax;
 
 	/*compute spacing by dividing length by the number of cells*/
-	dx = (xmax - xmin) / (ni - 1);
-	dv = (vmax - vmin) / (nj - 1);
-
-	// /*caculate x(i+1/2) pos*/
-	// for (int i = 0; i < ni - 1; i++)
-	// 	xcen[i] = xmin + 0.5 * dx + i * dx;
+	dx = (xmax - xmin) / (ni);
+	dv = (vmax - vmin) / (nj);
 
 	/*caculate x(i) pos*/
-	for (int i = 0; i < ni; i++)
-		x[i] = xmin + i * dx;
-
-	// /*caculate v(i+1/2) vel*/
-	// for (int i = 0; i < nj - 1; i++)
-	// 	vcen[i] = vmin + 0.5 * dv + i * dv;
+	for (int i = -nghosts; i <= ni + nghosts; i++)
+		X(i) = xmin + 0.5 * dx + i * dx;
 
 	/*caculate v(i) vel*/
-	for (int i = 0; i < nj; i++)
-		v[i] = vmin + i * dv;
+	for (int i = -nghosts; i < nj + nghosts; i++)
+		V(i) = vmin + 0.5 * dv + i * dv;
 }
 
 void World::printMySelf()

@@ -34,6 +34,8 @@ namespace Const
 	extern int Nx;
 	extern int Nv;
 
+	extern int nghosts;
+
 	extern double theta;	 // the field line inclination angle
 	extern double sin_theta; // sin(theta)
 	extern double V_Te;		 // m/s , electron thermal speed
@@ -78,6 +80,8 @@ public:
 	/*functions to set mesh origin and spacing*/
 	void setExtents(const double xmin, const double xmax, const double vmin, const double vmax);
 
+	void setNghost(int nghosts) { this->nghosts = nghosts; }
+
 	/*hookers provided for information about grid*/
 	double getXmax() const { return xmax; }
 	double getXmin() const { return xmin; }
@@ -87,9 +91,29 @@ public:
 	double getDv() const { return dv; }
 	double getDt() const { return dt; }
 
-	double X(int i) const { return x[i]; }
+	/*Topo x:0 v:1 */
 
-	double V(int i) const { return v[i]; }
+	inline vec2<int> CellIndex(vec2<int> &ij)
+	{
+		vec2<int> idx_ij;
+		idx_ij[0] = ij[0] + nghosts, idx_ij[1] = ij[1] + nghosts;
+		return idx_ij;
+	}
+
+	inline vec2<int> CellIndex(int i, int j) const
+	{
+		vec2<int> idx_ij;
+		idx_ij[0] = i + nghosts, idx_ij[1] = j + nghosts;
+		return idx_ij;
+	}
+
+	int xIdx(int i) const { return i + nghosts; }
+	int vIdx(int j) const { return j + nghosts; }
+
+	inline double X(int i) const { return x[xIdx(i)]; }
+	inline double V(int j) const { return v[vIdx(j)]; }
+	inline double &X(int i) { return x[xIdx(i)]; }
+	inline double &V(int j) { return v[vIdx(j)]; }
 
 	/*sets time step and number of time steps*/
 	void setTime(double dt, int num_ts)
@@ -138,6 +162,8 @@ public:
 	}
 
 	const int ni, nj; // number of nodes
+	int ni_total, nj_total;
+	int nghosts = 1;
 
 	static void printMySelf();
 	static void loadTime(string no);

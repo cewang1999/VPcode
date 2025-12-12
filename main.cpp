@@ -24,9 +24,9 @@ int main(int argc, char *argv[])
     World::loadTime(Case);
 
     World world(Nx, Nv);
-    world.setExtents(-1, 1, -6, 6);
+    world.setExtents(0, 1, 0, 6);
     World world_D(Nx, Nv);
-    world_D.setExtents(-1, 1, -0.14, 0.14);
+    world_D.setExtents(0, 1, 0, 0.14);
 
     vector<Species> species;
     species.reserve(2);
@@ -42,10 +42,10 @@ int main(int argc, char *argv[])
     sources.emplace_back(new DeltaTimeSource(e, world, 1. / Const::sigma));
     sources.emplace_back(new DeltaTimeSource(D, world_D, 1. / Const::sigma));
 
-    shift shiftx_e(ShiftDirection::X, e, world);
-    shift shifty_e(ShiftDirection::Y, e, world);
-    shift shiftx_D(ShiftDirection::X, D, world_D);
-    shift shifty_D(ShiftDirection::Y, D, world_D);
+    // shift shiftx_e(ShiftDirection::X, e, world);
+    // shift shifty_e(ShiftDirection::Y, e, world);
+    // shift shiftx_D(ShiftDirection::X, D, world_D);
+    // shift shifty_D(ShiftDirection::Y, D, world_D);
 
     APSolver solver(world, stringToEnum(Const::type), species);
 
@@ -62,17 +62,17 @@ int main(int argc, char *argv[])
         // for (auto &source : sources)
         //     source->pulse(world.getPhysicalTime());
 
-        shiftx_e.Upgrade_fs_X();
-        shiftx_D.Upgrade_fs_X();
+        // shiftx_e.Upgrade_fs_X();
+        // shiftx_D.Upgrade_fs_X();
 
-        solver.solve();            // 求解电势
-        solver.getElectricField(); // 求解电场
+        // solver.solve();            // 求解电势
+        // solver.getElectricField(); // 求解电场
 
-        shifty_e.Upgrade_fs_Y(solver);
-        shifty_D.Upgrade_fs_Y(solver);
+        // shifty_e.Upgrade_fs_Y(solver);
+        // shifty_D.Upgrade_fs_Y(solver);
 
-        shiftx_e.Upgrade_fs_X();
-        shiftx_D.Upgrade_fs_X();
+        // shiftx_e.Upgrade_fs_X();
+        // shiftx_D.Upgrade_fs_X();
 
         if (world.getTs() % 100 == 0)
         {
