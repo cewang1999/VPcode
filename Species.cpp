@@ -231,7 +231,7 @@ double Species::gettotalKE()
             double v1 = world.V(j);
             double v2 = world.V(j + 1);
 
-            val += 0.5 * 0.25 * mass * (f[i][j] * v1 * v1 + f[i][j + 1] * v2 * v2 + f[i + 1][j] * v1 * v1 + f[i + 1][j + 1] * v2 * v2) * dx * dv;
+            val += 0.5 * 0.25 * mass * (F(i, j) * v1 * v1 + F(i, j + 1) * v2 * v2 + F(i + 1, j) * v1 * v1 + F(i + 1, j + 1) * v2 * v2) * dx * dv;
             // val_t1 += 0.5 * 0.25 * (f[i][j] + f[i][j + 1] + f[i + 1][j] + f[i + 1][j + 1]) * dx * dv;
         }
 
