@@ -14,74 +14,122 @@ enum SolverType
     DS
 };
 
+struct Moment
+{
+    Moment() {}
+    ~Moment() {}
+
+    inline void resize(int n, int nghosts) { vector.resize(n + nghosts * 2, 0); }
+
+    inline int idx(int i) const { return i + nghosts; }
+    inline double val(int i) const { return vector[idx(i)]; }
+    inline double &val(int i) { return vector[idx(i)]; }
+
+private:
+    dvector vector;
+    int nghosts;
+};
+
 extern SolverType stringToEnum(const std::string &str);
 
 class APSolver
 {
+private:
+    // 等离子体
+    std::vector<Species> &species;
+
+    // 电场网格
+    int ni, nj;
+    int nghosts;
+    double dx;
+
+    // 电场
+    Moment phi, Ef;
+    // 计算moment
+    Moment rho, nu, nuu;
+
+    // 准中性条件
+    double lamda = 1e-3;
+
+    // 计算类型
+    SolverType type;
+
+    // 计算moment的工具函数
+    void computeRho()
+    {
+        for (auto &sp : species)
+            for (int i = -nghosts; i < ni + nghosts; ++i)
+            {
+                rho.val(i) = 0;
+                for (int j = -nghosts; j < nj + nghosts; ++j)
+                    rho.val(i) += sp.F(i, j) * sp.charge * dx * sp.getWorld().getDv();
+            }
+    }
+    void computeNu()
+    {
+        for (auto &sp : species)
+            for (int i = -nghosts; i < ni + nghosts; ++i)
+            {
+                nu.val(i) = 0;
+                for (int j = -nghosts; j < nj + nghosts; ++j)
+                {
+                    double v = sp.getWorld().vIdx(j);
+                    nu.val(i) += sp.F(i, j) * sp.charge * v * dx * sp.getWorld().getDv();
+                }
+            }
+    }
+    void computeNuu()
+    {
+        for (auto &sp : species)
+            for (int i = -nghosts; i < ni + nghosts; ++i)
+            {
+                nuu.val(i) = 0;
+                for (int j = -nghosts; j < nj + nghosts; ++j)
+                {
+                    double v = sp.getWorld().vIdx(j);
+                    nuu.val(i) += sp.F(i, j) * sp.charge * v * v * dx * sp.getWorld().getDv();
+                }
+            }
+    }
+    void computeMoments()
+    {
+        computeRho();
+        computeNu();
+        computeNuu();
+    }
+
+    bool solverAP();
+
 public:
-    APSolver(World &world, SolverType type, std::vector<Species> &species);
+    APSolver(std::vector<Species> &species, SolverType type, int nghosts = 1, double lamda = 1e-3) : type(type), species(species), lamda(lamda)
+    {
+        Species &e = species[0];
+        dx = e.getWorld().getDx();
+        ni = e.getWorld().ni, nj = e.getWorld().nj;
+
+        if (type == AP)
+        {
+            rho.resize(ni, nghosts);
+            nu.resize(ni, nghosts);
+            nuu.resize(ni, nghosts);
+        }
+
+        phi.resize(ni, nghosts);
+        Ef.resize(ni, nghosts);
+    }
+    
+    ~APSolver() {}
 
     bool solve()
     {
-        switch (solver_type)
+        switch (type)
         {
         case AP:
             return solverAP();
-        case Thomas:
-            return solverThomas();
-        case GS:
-            return solverGS();
-        case DS:
-            return solverDS(world.getPhysicalTime());
         default:
             return false;
         }
     }
-
-    //求解电场
-    void getElectricField();
-
-    //返回电场能
-    double getElectricEnergy();
-
-    //读取电场
-    void readEF();
-
-    dvector phi; //电势
-    dvector E;   //电场
-
-protected:
-    World &world;
-    SolverType solver_type; //求解器类型
-    std::vector<Species> &species;
-    dvector diff_n;      //粒子数之差
-    dvector tol_n;       //粒子数之和
-    dvector diff_J;      //流数差
-    dvector diff_S;      //能量差
-    dvector par_tol_n;   //粒子数之和一阶微分
-    dvector par2_diff_S; //能量差二阶微分
-    dvector par_diff_J;  //流数差一阶微分
-
-    // 初始化参数
-    void initialize();
-
-    // AP自适应求解电势
-    bool solverAP();
-
-    // GS-SOR求解电势 w = 1.4
-    bool solverGS();
-
-    // 三对角求解电势
-    bool solverThomas();
-
-    // 解析求解DS电势 ref to PlasmaPhysControlFusion 53 (2011) 015012
-    bool solverDS(double t);
-
-    // 求一阶导数
-    dvector diff(dvector &f);
-
-    // 求二阶导数
-    dvector diff2(dvector &f);
 };
 
 #endif
