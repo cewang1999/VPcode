@@ -206,7 +206,7 @@ void World::setExtents(const double _xmin, const double _xmax, const double _vmi
 	dv = (vmax - vmin) / (nj);
 
 	/*caculate x(i) pos*/
-	for (int i = -nghosts; i <= ni + nghosts; i++)
+	for (int i = -nghosts; i < ni + nghosts; i++)
 		X(i) = xmin + 0.5 * dx + i * dx;
 
 	/*caculate v(i) vel*/
