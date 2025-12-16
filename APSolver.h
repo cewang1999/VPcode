@@ -63,48 +63,63 @@ private:
     dvector a, b, c, d;
     dvector c_star, d_star;
 
+    dvector _rho;
+
     // 计算moment的工具函数
     void computeRho()
     {
-        for (auto &sp : species)
-            for (int i = -nghosts; i < ni + nghosts; ++i)
-            {
-                for (int j = -nghosts; j < nj + nghosts; ++j)
+
+        for (int i = -nghosts; i < ni + nghosts; ++i)
+        {
+            rho.val(i) = 0;
+            for (auto &sp : species)
+                for (int j = 0; j < nj; ++j)
                     rho.val(i) += sp.F(i, j) * sp.charge * sp.getWorld().getDv();
-            }
+        }
+
+        for (int i = 0; i < ni + nghosts; ++i)
+        {
+            _rho[i] = 0.5 * (rho.val(i - 1) + rho.val(i));
+        }
     }
     void computeNu()
     {
-        for (auto &sp : species)
-            for (int i = -nghosts; i < ni + nghosts; ++i)
-            {
+
+        for (int i = -nghosts; i < ni + nghosts; ++i)
+        {
+            nu.val(i) = 0;
+            for (auto &sp : species)
                 for (int j = -nghosts; j < nj + nghosts; ++j)
                 {
                     double v = sp.getWorld().V(j);
                     nu.val(i) += sp.F(i, j) * sp.charge * v * sp.getWorld().getDv();
                 }
-            }
+        }
     }
     void computeNuu()
     {
-        for (auto &sp : species)
-            for (int i = -nghosts; i < ni + nghosts; ++i)
-            {
+
+        for (int i = -nghosts; i < ni + nghosts; ++i)
+        {
+            nuu.val(i) = 0;
+            for (auto &sp : species)
                 for (int j = -nghosts; j < nj + nghosts; ++j)
                 {
                     double v = sp.getWorld().V(j);
                     nuu.val(i) += sp.F(i, j) * sp.charge * v * v * sp.getWorld().getDv();
                 }
-            }
+        }
     }
     void computeNtol()
     {
-        for (auto &sp : species)
-            for (int i = -nghosts; i < ni + nghosts; ++i)
-            {
+
+        for (int i = -nghosts; i < ni + nghosts; ++i)
+        {
+            ntol.val(i) = 0.;
+            for (auto &sp : species)
                 for (int j = -nghosts; j < nj + nghosts; ++j)
                     ntol.val(i) += sp.F(i, j) / sp.mass * sp.getWorld().getDv();
-            }
+        }
     }
     void computeMoments()
     {
@@ -178,6 +193,8 @@ public:
         Ef.resize(ni, nghosts);
         a.resize(ni, 0), b.resize(ni, 0), c.resize(ni, 0), d.resize(ni, 0);
         c_star.resize(ni, 0), d_star.resize(ni, 0);
+
+        _rho.resize(ni + 1, 0);
     }
 
     ~APSolver() {}
