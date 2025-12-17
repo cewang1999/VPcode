@@ -149,7 +149,7 @@ public:
 
 class PFC2FLUX : public FluxCalculator
 {
-private:
+private: // 矫正器出错
     double slopeCorrectorLeft(double fR, double fL, double rat) const
     {
         double df = fR - fL;
@@ -172,13 +172,14 @@ public:
                                         double dx, double dt, double alpha, double rat1 = 0., double rat2 = 0.) const override
     {
         double flux = alpha;
-        if (velocity > 0)
+        if (velocity > 1e-30)
         {
             // 上风在左侧：使用 L1, R1 重构
             double fL = stencil[0];
             double fR = stencil[1];
-            double epsilon = slopeCorrectorLeft(fR, fL, rat1);
+            double epsilon = 1.;
             flux *= fL + 0.5 * epsilon * (1 - alpha / dx) * (fR - fL);
+            flux += rat2 * dx;
             flux /= dt;
         }
         else
@@ -186,8 +187,9 @@ public:
             // 上风在右侧：使用 L1, R1重构
             double fL = stencil[0];
             double fR = stencil[1];
-            double epsilon = slopeCorrectorRight(fR, fL, rat1);
+            double epsilon = 1.;
             flux *= fR - 0.5 * epsilon * (1 + alpha / dx) * (fR - fL);
+            flux -= rat2 * dx;
             flux /= dt;
         }
         return flux;
@@ -224,17 +226,17 @@ public:
                                         double dx, double dt, double alpha, double rat1 = 0., double rat2 = 0.) const override
     {
         double flux = alpha;
-        if (velocity > 0)
+        if (velocity > 1e-30)
         {
             // 上风在左侧：使用 L1, R1 重构
             double fLL = stencil[1];
             double fL = stencil[0];
             double fR = stencil[2];
-            double epsL = slopeCorrectorLeft(fL, fLL, rat1);
-            double epsR = slopeCorrectorRight(fR, fL, rat2);
-            flux *= fL + 0.1667 * epsR * (1 - alpha / dx) * (2 - alpha / dx) * (fR - fL) +
-                    0.1667 * epsL * (1 - alpha / dx) * (1 + alpha / dx) * (fL - fLL);
-            flux += rat2 * dx;
+            double epsL = 1.;
+            double epsR = 1.;
+            flux *= fL + 1. / 6. * epsR * (1. - alpha / dx) * (2. - alpha / dx) * (fR - fL) +
+                    1. / 6. * epsL * (1. - alpha / dx) * (1 + alpha / dx) * (fL - fLL);
+            flux += 0;
             flux /= dt;
         }
         else
@@ -243,11 +245,11 @@ public:
             double fL = stencil[0];
             double fR = stencil[2];
             double fRR = stencil[3];
-            double epsL = slopeCorrectorLeft(fR, fL, rat1);
-            double epsR = slopeCorrectorRight(fRR, fR, rat1);
-            flux *= fR - 0.1667 * epsR * (1 - alpha / dx) * (1 + alpha / dx) * (fRR - fR) -
-                    0.1667 * epsL * (2 + alpha / dx) * (1 + alpha / dx) * (fR - fL);
-            flux -= rat2 * dx;
+            double epsL = 1.;
+            double epsR = 1.;
+            flux *= fR - 1. / 6. * epsR * (1. - alpha / dx) * (1. + alpha / dx) * (fRR - fR) -
+                    1. / 6. * epsL * (2. + alpha / dx) * (1. + alpha / dx) * (fR - fL);
+            flux -= 0;
             flux /= dt;
         }
         return flux;
