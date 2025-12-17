@@ -49,6 +49,8 @@ bool APSolver::solverAP()
         phi.val(i) = d_star[i] - c_star[i] * phi.val(i + 1);
     }
 
+    phi.val(-1) = -phi.val(0), phi.val(ni) = -phi.val(ni - 1);
+
     computeElectricField();
 
     return true;

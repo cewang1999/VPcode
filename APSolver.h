@@ -63,8 +63,6 @@ private:
     dvector a, b, c, d;
     dvector c_star, d_star;
 
-    dvector _rho;
-
     // 计算moment的工具函数
     void computeRho()
     {
@@ -75,11 +73,6 @@ private:
             for (auto &sp : species)
                 for (int j = 0; j < nj; ++j)
                     rho.val(i) += sp.F(i, j) * sp.charge * sp.getWorld().getDv();
-        }
-
-        for (int i = 0; i < ni + nghosts; ++i)
-        {
-            _rho[i] = 0.5 * (rho.val(i - 1) + rho.val(i));
         }
     }
     void computeNu()
