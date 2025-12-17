@@ -187,7 +187,6 @@ public:
         a.resize(ni, 0), b.resize(ni, 0), c.resize(ni, 0), d.resize(ni, 0);
         c_star.resize(ni, 0), d_star.resize(ni, 0);
 
-        _rho.resize(ni + 1, 0);
     }
 
     ~APSolver() {}
