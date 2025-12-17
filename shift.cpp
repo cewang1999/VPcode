@@ -4,8 +4,11 @@
 void ShiftX::computeFlux()
 {
     for (int j = 0; j < nj; ++j)
+    {
         for (int i = 0; i < ni; ++i)
             computeFlux(i, j);
+        // cout << endl;
+    }
 }
 
 void ShiftX::computeFlux(int i, int j)
@@ -48,54 +51,63 @@ void ShiftX::computeFlux(int i, int j)
             sum = sumFrmk2J(Ci + 1, world.xIdx(Cj - 1), j);
         }
         flux[i][j] = flux_calc->computeFluxHighOrder(stencil, velocity, world.getDx(), world.getDt(), alpha, maxlimiter[j], sum);
+        // flux[i][j] = (flux[i][j] < 1e-10) ? 0. : flux[i][j];
+        // cout << flux[i][j] << "...";
+    }
+    else
+    {
+        join[0] = i, join[1] = j;
+        collectStencil(velocity, join, stencil);
+        flux[i][j] = flux_calc->computeFlux(stencil, velocity, world.getDx(), world.getDt());
+        // cout << flux[i][j] << "...";
     }
 }
 
 void ShiftX::collectStencil(double v, vec2<int> join, vector<double> &stencil)
 {
-    int left_size = 2;  // flux_calculator->getLeftStencilSize();
-    int right_size = 2; // flux_calculator->getRightStencilSize();
+    int left_size = flux_calc->getLeftStencilSize();
+    int right_size = flux_calc->getRightStencilSize();
 
     Field &f = sp.f;
 
     stencil.reserve(left_size + right_size);
 
-    if (v > 1e-30)
-    {
-        // 上风在左侧：需要左侧更多的点
-        vector<vec2<int>> left_cells(left_size);
-        vector<vec2<int>> right_cells(right_size);
+    // if (v > 1e-30)
+    // {
+    // 上风在左侧：需要左侧更多的点
+    vector<vec2<int>> left_cells(left_size);
+    vector<vec2<int>> right_cells(right_size);
 
-        getleftCells(join, left_size, left_cells);
-        getrightCells(join, right_size, right_cells);
+    getleftCells(join, left_size, left_cells);
+    getrightCells(join, right_size, right_cells);
 
-        // 组装stencil: [L_n, ..., L_1, R_1, ..., R_m]
-        for (vec2<int> cell_id : left_cells)
-            stencil.push_back(f(cell_id[0], cell_id[1]));
+    // 组装stencil: [L_n, ..., L_1, R_1, ..., R_m]
+    for (vec2<int> cell_id : left_cells)
+        stencil.push_back(f(cell_id[0], cell_id[1]));
 
-        for (vec2<int> cell_id : right_cells)
-            stencil.push_back(f(cell_id[0], cell_id[1]));
-    }
-    else
-    {
-        // 上风在右侧：需要右侧更多的点
-        // 对于WENO5，右侧需要3个点
-        // int right_count = (flux_calculator->getName() == "WENO5") ? 3 : right_size;
-        // int left_count = (flux_calculator->getName() == "WENO5") ? 2 : left_size;
+    for (vec2<int> cell_id : right_cells)
+        stencil.push_back(f(cell_id[0], cell_id[1]));
+    // }
+    // else
+    // {
+    // 上风在右侧：需要右侧更多的点
+    // 对于WENO5，右侧需要3个点
+    // int right_count = (flux_calculator->getName() == "WENO5") ? 3 : right_size;
+    // int left_count = (flux_calculator->getName() == "WENO5") ? 2 : left_size;
 
-        vector<vec2<int>> left_cells(left_size);
-        vector<vec2<int>> right_cells(right_size);
+    //     vector<vec2<int>> left_cells(left_size);
+    //     vector<vec2<int>> right_cells(right_size);
 
-        getleftCells(join, left_size, left_cells);
-        getrightCells(join, right_size, right_cells);
+    //     getleftCells(join, left_size, left_cells);
+    //     getrightCells(join, right_size, right_cells);
 
-        // 组装stencil: [L_n, ..., L_1, R_1, ..., R_m]
-        for (vec2<int> cell_id : left_cells)
-            stencil.push_back(f(cell_id[0], cell_id[1]));
+    //     // 组装stencil: [L_n, ..., L_1, R_1, ..., R_m]
+    //     for (vec2<int> cell_id : left_cells)
+    //         stencil.push_back(f(cell_id[0], cell_id[1]));
 
-        for (vec2<int> cell_id : right_cells)
-            stencil.push_back(f(cell_id[0], cell_id[1]));
-    }
+    //     for (vec2<int> cell_id : right_cells)
+    //         stencil.push_back(f(cell_id[0], cell_id[1]));
+    // }
 }
 
 void ShiftX::computMaxLimiter()
@@ -122,7 +134,7 @@ void ShiftX::updateInteriorCells()
         {
             double div_x = (flux[i + 1][j] - flux[i][j]) / dx;
             sp.F(i, j) -= dt * div_x;
-            sp.F(i, j) = fmax(sp.F(i, j), 0);
+            sp.F(i, j) = (sp.F(i, j) < 1e-10) ? 0. : sp.F(i, j); //      fmax(sp.F(i, j), 0);
         }
 }
 
@@ -133,6 +145,7 @@ void ShiftX::advection()
     fillGhostCells();
     computeFlux();
     updateInteriorCells();
+    fillGhostCells();
 }
 
 void ShiftV::computeFlux()
@@ -147,7 +160,9 @@ void ShiftV::computeFlux(int i, int j)
     vec2<int> L, R, join;
     L = leftCell(i, j), R = rightCell(i, j);
     double *v = world.getVarray(), *x = world.getXarray();
-    double velocity = 0.5 * (x[L[0]] + x[R[0]]); // EF
+
+    double velocity = sp.charge * getElectricField(i) / sp.mass; // E Force
+    // double velocity = 0.5 * (x[L[0]] + x[R[0]]); // EF
 
     std::vector<double> stencil;
 
@@ -183,12 +198,19 @@ void ShiftV::computeFlux(int i, int j)
         }
         flux[i][j] = flux_calc->computeFluxHighOrder(stencil, velocity, world.getDv(), world.getDt(), alpha, maxlimiter[i], sum);
     }
+    else
+    {
+        join[0] = i, join[1] = j;
+        collectStencil(velocity, join, stencil);
+        flux[i][j] = flux_calc->computeFlux(stencil, velocity, world.getDv(), world.getDt());
+        // cout << flux[i][j] << "...";
+    }
 }
 
 void ShiftV::collectStencil(double v, vec2<int> join, vector<double> &stencil)
 {
-    int left_size = 2;  // flux_calculator->getLeftStencilSize();
-    int right_size = 2; // flux_calculator->getRightStencilSize();
+    int left_size = flux_calc->getLeftStencilSize();
+    int right_size = flux_calc->getRightStencilSize();
 
     Field &f = sp.f;
 
@@ -256,7 +278,7 @@ void ShiftV::updateInteriorCells()
         {
             double div_v = (flux[i][j + 1] - flux[i][j]) / dv;
             sp.F(i, j) -= dt * div_v;
-            sp.F(i, j) = fmax(sp.F(i, j), 1e-6);
+            sp.F(i, j) = (sp.F(i, j) < 1e-10) ? 0. : sp.F(i, j);
         }
 }
 
@@ -267,4 +289,5 @@ void ShiftV::advection()
     fillGhostCells();
     computeFlux();
     updateInteriorCells();
+    fillGhostCells();
 }

@@ -9,12 +9,6 @@
 
 class APSolver;
 
-// enum ShiftDirection
-// {
-//     X,
-//     Y
-// };
-
 class Shift
 {
 protected:
@@ -25,7 +19,7 @@ protected:
 public:
     Shift(Species &sp) : sp(sp), world(sp.getWorld())
     {
-        flux_calc = std::make_unique<PFC3FLUX>();
+        flux_calc = std::make_unique<PFC2FLUX>();
     }
     ~Shift() {}
 };
@@ -129,7 +123,7 @@ private:
     double sumFrmk2J(int ck, int cj, int j) const
     {
         Field &f = sp.f;
-        double sum = 0;
+        double sum = 0.;
         int jdx = world.vIdx(j);
         for (int i = ck; i <= cj; ++i)
             sum += f(i, jdx);
@@ -165,7 +159,8 @@ protected:
     void computeFlux(int i, int j);                        // 计算 (i,j) 处 Flux
     void updateInteriorCells();                            // 填充 X 方向所有网格
 
-    double getElectricField(int i) { return world.X(i); } // 委托给solver
+    // double getElectricField(int i) { return world.X(i); } // 委托给solver
+    double getElectricField(int i) const { return solver.getElectricField(i); }
 
     // 逻辑链接：仅限V方向的链接,链接的左右cell
     vec2<int> leftCell(const int i, const int j)

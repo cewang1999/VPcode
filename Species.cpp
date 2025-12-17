@@ -225,13 +225,11 @@ double Species::gettotalKE()
     double val_t2 = 0;
     double val_total = 0;
 
-    for (int i = 0; i < N - 1; i++)
-        for (int j = 0; j < M - 1; j++)
+    for (int i = 0; i < N; i++)
+        for (int j = 0; j < M; j++)
         {
-            double v1 = world.V(j);
-            double v2 = world.V(j + 1);
-
-            val += 0.5 * 0.25 * mass * (F(i, j) * v1 * v1 + F(i, j + 1) * v2 * v2 + F(i + 1, j) * v1 * v1 + F(i + 1, j + 1) * v2 * v2) * dx * dv;
+            double v = world.V(j);
+            val += 0.5 * mass * F(i, j) * v * v * dx * dv;
             // val_t1 += 0.5 * 0.25 * (f[i][j] + f[i][j + 1] + f[i + 1][j] + f[i + 1][j + 1]) * dx * dv;
         }
 
@@ -331,14 +329,14 @@ double Species::ComputeErosionRate()
 // 边界设置
 void Species::fillGhostCellsX()
 {
-    fillGhostBoundary(0, 0, PERIODIC); // X-左
-    fillGhostBoundary(0, 1, PERIODIC); // X-右
+    fillGhostBoundary(0, 0, WALL); // X-左
+    fillGhostBoundary(0, 1, WALL); // X-右
 }
 
 void Species::fillGhostCellsV()
 {
-    fillGhostBoundary(1, 0, PERIODIC); // X-左
-    fillGhostBoundary(1, 1, PERIODIC); // X-右
+    fillGhostBoundary(1, 0, NEUMANN); // V-左
+    fillGhostBoundary(1, 1, NEUMANN); // V-右
 }
 
 void Species::fillGhostBoundary(int dir, int side, const BoundaryType BT)
@@ -386,9 +384,29 @@ void Species::fillGhostBoundary(int dir, int side, const BoundaryType BT)
             case NEUMANN:
             {
                 int sign = (side == 0) ? -1 : 1;
-                F(ghost_idx) = F(interior_idx);
+                f[ghost_idx[0]][ghost_idx[1]] = f(interior_idx[0], interior_idx[1]);
             }
             break;
+            case WALL:
+            {
+                int sign = (side == 0) ? -1 : 1;
+                if (dir == 0)
+                {
+                    f[ghost_idx[0]][ghost_idx[1]] = f(interior_idx[0], interior_idx[1]);
+                    if (side == 0)
+                    {
+                        if (world.V(j) > 1e-30)
+                            f[ghost_idx[0]][ghost_idx[1]] = 0.;
+                    }
+                    else if (side == 1)
+                        if (world.V(j) < 1e-30)
+                            f[ghost_idx[0]][ghost_idx[1]] = 0.;
+                }
+                else
+                    cout << " WALL condition only applyed on X direction " << endl;
+
+                break;
+            }
             }
         }
     }
