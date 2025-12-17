@@ -236,7 +236,7 @@ public:
             double epsR = 1.;
             flux *= fL + 1. / 6. * epsR * (1. - alpha / dx) * (2. - alpha / dx) * (fR - fL) +
                     1. / 6. * epsL * (1. - alpha / dx) * (1 + alpha / dx) * (fL - fLL);
-            flux += 0;
+            flux += rat2 * dx;
             flux /= dt;
         }
         else
@@ -249,7 +249,7 @@ public:
             double epsR = 1.;
             flux *= fR - 1. / 6. * epsR * (1. - alpha / dx) * (1. + alpha / dx) * (fRR - fR) -
                     1. / 6. * epsL * (2. + alpha / dx) * (1. + alpha / dx) * (fR - fL);
-            flux -= 0;
+            flux -= rat2 * dx;
             flux /= dt;
         }
         return flux;
