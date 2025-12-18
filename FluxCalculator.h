@@ -217,7 +217,7 @@ private:
         double df = fR - fL;
         double fmax = rat;
 
-        return (df > 1e-30) ? max(min(1., 2. * (fmax - fL) / df), 0.) : max(min(1., -2. * fL / df), 0.);
+        return (df > 1e-30) ? max(min(1., 2. * (fmax - fR) / df), 0.) : max(min(1., -2. * fR / df), 0.);
     }
 
 public:
@@ -232,8 +232,8 @@ public:
             double fLL = stencil[1];
             double fL = stencil[0];
             double fR = stencil[2];
-            double epsL = 1.;
-            double epsR = 1.;
+            double epsL = slopeCorrectorLeft(fL, fLL, rat1);
+            double epsR =slopeCorrectorRight(fR, fL, rat1);
             flux *= fL + 1. / 6. * epsR * (1. - alpha / dx) * (2. - alpha / dx) * (fR - fL) +
                     1. / 6. * epsL * (1. - alpha / dx) * (1 + alpha / dx) * (fL - fLL);
             flux += rat2 * dx;
@@ -245,8 +245,8 @@ public:
             double fL = stencil[0];
             double fR = stencil[2];
             double fRR = stencil[3];
-            double epsL = 1.;
-            double epsR = 1.;
+            double epsL =slopeCorrectorLeft(fR,fL,rat1);
+            double epsR =slopeCorrectorRight(fRR,fR,rat1);
             flux *= fR - 1. / 6. * epsR * (1. - alpha / dx) * (1. + alpha / dx) * (fRR - fR) -
                     1. / 6. * epsL * (2. + alpha / dx) * (1. + alpha / dx) * (fR - fL);
             flux -= rat2 * dx;
