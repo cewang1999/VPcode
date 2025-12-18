@@ -14,12 +14,14 @@ class Shift
 protected:
     Species &sp;
     World &world;
+    double dt;
+    int cfl_number;
     unique_ptr<FluxCalculator> flux_calc;
 
 public:
-    Shift(Species &sp) : sp(sp), world(sp.getWorld())
+    Shift(Species &sp) : sp(sp), world(sp.getWorld()), dt(sp.getWorld().getDt())
     {
-        flux_calc = std::make_unique<PFC2FLUX>();
+        flux_calc = std::make_unique<PFC3FLUX>();
     }
     ~Shift() {}
 };
@@ -32,6 +34,7 @@ public:
         ni = world.ni + 1;
         nj = world.nj;
         maxlimiter.resize(nj, 0);
+        dt = dt * 0.5; // half step for 2nd accuracy on time
     }
     ~ShiftX() {}
 
@@ -236,7 +239,7 @@ protected:
     double sumFrmk2J(int ck, int cj, int i) const
     {
         Field &f = sp.f;
-        double sum = 0;
+        double sum = 0.;
         int idx = world.xIdx(i);
         for (int i = ck; i <= cj; ++i)
             sum += f(idx, i);

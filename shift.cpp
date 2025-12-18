@@ -28,7 +28,7 @@ void ShiftX::computeFlux(int i, int j)
         {
             int Ci = L[0];
             double xRi = x[Ci] + 0.5 * world.getDx();
-            double X = xRi - world.getDt() * velocity;
+            double X = xRi - dt * velocity;
             int Cj = findCell(X);
             int jrx = cell_Join(Cj, 1);
             join[0] = jrx, join[1] = j;
@@ -41,7 +41,7 @@ void ShiftX::computeFlux(int i, int j)
         {
             int Ci = L[0];
             double xRi = x[Ci] + 0.5 * world.getDx();
-            double X = xRi - world.getDt() * velocity;
+            double X = xRi - dt * velocity;
             int Cj = findCell(X);
             int jlx = cell_Join(Cj, 0);
             join[0] = jlx, join[1] = j;
@@ -50,7 +50,7 @@ void ShiftX::computeFlux(int i, int j)
             alpha = xLj - X;
             sum = sumFrmk2J(Ci + 1, world.xIdx(Cj - 1), j);
         }
-        flux[i][j] = flux_calc->computeFluxHighOrder(stencil, velocity, world.getDx(), world.getDt(), alpha, maxlimiter[j], sum);
+        flux[i][j] = flux_calc->computeFluxHighOrder(stencil, velocity, world.getDx(), dt, alpha, maxlimiter[j], sum);
         // flux[i][j] = (flux[i][j] < 1e-10) ? 0. : flux[i][j];
         // cout << flux[i][j] << "...";
     }
@@ -58,7 +58,7 @@ void ShiftX::computeFlux(int i, int j)
     {
         join[0] = i, join[1] = j;
         collectStencil(velocity, join, stencil);
-        flux[i][j] = flux_calc->computeFlux(stencil, velocity, world.getDx(), world.getDt());
+        flux[i][j] = flux_calc->computeFlux(stencil, velocity, world.getDx(), dt);
         // cout << flux[i][j] << "...";
     }
 }
@@ -87,27 +87,6 @@ void ShiftX::collectStencil(double v, vec2<int> join, vector<double> &stencil)
 
     for (vec2<int> cell_id : right_cells)
         stencil.push_back(f(cell_id[0], cell_id[1]));
-    // }
-    // else
-    // {
-    // 上风在右侧：需要右侧更多的点
-    // 对于WENO5，右侧需要3个点
-    // int right_count = (flux_calculator->getName() == "WENO5") ? 3 : right_size;
-    // int left_count = (flux_calculator->getName() == "WENO5") ? 2 : left_size;
-
-    //     vector<vec2<int>> left_cells(left_size);
-    //     vector<vec2<int>> right_cells(right_size);
-
-    //     getleftCells(join, left_size, left_cells);
-    //     getrightCells(join, right_size, right_cells);
-
-    //     // 组装stencil: [L_n, ..., L_1, R_1, ..., R_m]
-    //     for (vec2<int> cell_id : left_cells)
-    //         stencil.push_back(f(cell_id[0], cell_id[1]));
-
-    //     for (vec2<int> cell_id : right_cells)
-    //         stencil.push_back(f(cell_id[0], cell_id[1]));
-    // }
 }
 
 void ShiftX::computMaxLimiter()
@@ -127,7 +106,7 @@ void ShiftX::computMaxLimiter()
 void ShiftX::updateInteriorCells()
 {
     int _ni = world.ni, _nj = world.nj;
-    double dx = world.getDx(), dt = world.getDt();
+    double dx = world.getDx();
 
     for (int j = 0; j < _nj; ++j)
         for (int i = 0; i < _ni; ++i)
@@ -174,7 +153,7 @@ void ShiftV::computeFlux(int i, int j)
         {
             int Ci = L[1];
             double xRi = v[Ci] + 0.5 * world.getDv();
-            double X = xRi - world.getDt() * velocity;
+            double X = xRi - dt * velocity;
             int Cj = findCell(X);
             int jrx = cell_Join(Cj, 1);
             join[0] = i, join[1] = jrx;
@@ -187,7 +166,7 @@ void ShiftV::computeFlux(int i, int j)
         {
             int Ci = L[1];
             double xRi = v[Ci] + 0.5 * world.getDv();
-            double X = xRi - world.getDt() * velocity;
+            double X = xRi - dt * velocity;
             int Cj = findCell(X);
             int jlx = cell_Join(Cj, 0);
             join[0] = i, join[1] = jlx;
@@ -196,13 +175,13 @@ void ShiftV::computeFlux(int i, int j)
             alpha = xLj - X;
             sum = sumFrmk2J(Ci + 1, world.vIdx(Cj - 1), i);
         }
-        flux[i][j] = flux_calc->computeFluxHighOrder(stencil, velocity, world.getDv(), world.getDt(), alpha, maxlimiter[i], sum);
+        flux[i][j] = flux_calc->computeFluxHighOrder(stencil, velocity, world.getDv(), dt, alpha, maxlimiter[i], sum);
     }
     else
     {
         join[0] = i, join[1] = j;
         collectStencil(velocity, join, stencil);
-        flux[i][j] = flux_calc->computeFlux(stencil, velocity, world.getDv(), world.getDt());
+        flux[i][j] = flux_calc->computeFlux(stencil, velocity, world.getDv(), dt);
         // cout << flux[i][j] << "...";
     }
 }
@@ -271,7 +250,7 @@ void ShiftV::computMaxLimiter()
 void ShiftV::updateInteriorCells()
 {
     int _ni = world.ni, _nj = world.nj;
-    double dv = world.getDv(), dt = world.getDt();
+    double dv = world.getDv();
 
     for (int i = 0; i < _ni; ++i)
         for (int j = 0; j < _nj; ++j)
