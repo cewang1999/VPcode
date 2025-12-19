@@ -19,14 +19,14 @@ int main(int argc, char *argv[])
 {
     string Case = "2";
     Const::readConst(Case);
-    Const::printMyself();
-    World::printMySelf();
+    // Const::printMyself();
+    // World::printMySelf();
     World::loadTime(Case);
 
     World world(Nx, Nv);
-    world.setExtents(0, 1, 0, 6);
+    world.setExtents(-1., 1., -6., 6.);
     World world_D(Nx, Nv);
-    world_D.setExtents(0, 1, 0, 0.14);
+    world_D.setExtents(-1., 1., -0.15, 0.15);
 
     vector<Species> species;
     species.reserve(2);
@@ -37,48 +37,43 @@ int main(int argc, char *argv[])
     Species &D = species[1];
 
     vector<unique_ptr<Source>> sources;
-    // sources.emplace_back(new PulseTimeSource(e, world, 0.7, 1.4));
-    // sources.emplace_back(new PulseTimeSource(H, world_H, 0.7, 1.4));
     sources.emplace_back(new DeltaTimeSource(e, world, 1. / Const::sigma));
     sources.emplace_back(new DeltaTimeSource(D, world_D, 1. / Const::sigma));
 
-    // shift shiftx_e(ShiftDirection::X, e, world);
-    // shift shifty_e(ShiftDirection::Y, e, world);
-    // shift shiftx_D(ShiftDirection::X, D, world_D);
-    // shift shifty_D(ShiftDirection::Y, D, world_D);
+    APSolver solver(species, stringToEnum(Const::type));
 
-    APSolver solver(world, stringToEnum(Const::type), species);
+    ShiftX eShiftx(e), iShiftx(D);
+    ShiftV eShiftv(e, solver), iShiftv(D, solver);
 
     while (world.advanceNextStep())
     {
 
-        if (world.getTs() % 100 == 0)
+        if (world.getTs() % 10 == 0)
         {
             OUTPUT::screenOutput(world, species, solver);
+            OUTPUT::diagOutput(world, species, solver);
             if (world.getTs() == 0)
                 OUTPUT::outputGrid(world);
         }
 
-        // for (auto &source : sources)
-        //     source->pulse(world.getPhysicalTime());
+        solver.solve(); // 求解电势
 
-        // shiftx_e.Upgrade_fs_X();
-        // shiftx_D.Upgrade_fs_X();
+        eShiftx.advection();
+        iShiftx.advection();
 
-        // solver.solve();            // 求解电势
-        // solver.getElectricField(); // 求解电场
+        eShiftv.advection();
+        iShiftv.advection();
 
-        // shifty_e.Upgrade_fs_Y(solver);
-        // shifty_D.Upgrade_fs_Y(solver);
+        // eShiftx.advection();
+        // iShiftx.advection();
 
-        // shiftx_e.Upgrade_fs_X();
-        // shiftx_D.Upgrade_fs_X();
+        // eShiftx.advection();
+        // iShiftx.advection();
 
         if (world.getTs() % 100 == 0)
         {
-            OUTPUT::diagOutput(world, species, solver);
             // OUTPUT::output(D.f, world_D, world.getTs());
-            // OUTPUT::output(e.f, world, world.getTs());
+            OUTPUT::output(e.f, world, world.getTs());
             // OUTPUT::output(solver, world, world.getTs());
             // OUTPUT::output(species, world, world_H, world.getTs());
         }

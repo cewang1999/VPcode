@@ -100,30 +100,30 @@ bool OUTPUT::output(const dvector &f, const World &world, int step)
     return true;
 }
 
-bool OUTPUT::output(APSolver &solver, const World &world, int step)
-{
-    stringstream ss;
-    ss << "Poisson/EF";
-    if (step >= 0)
-        ss << "_" << setw(6) << setfill('0') << step << ".txt"; // notice the '' not " " in setfill.
-    ofstream out(ss.str());
+// bool OUTPUT::output(APSolver &solver, const World &world, int step)
+// {
+//     stringstream ss;
+//     ss << "Poisson/EF";
+//     if (step >= 0)
+//         ss << "_" << setw(6) << setfill('0') << step << ".txt"; // notice the '' not " " in setfill.
+//     ofstream out(ss.str());
 
-    if (!out)
-    {
-        cerr << "Could not open output file !" << endl;
-        return false;
-    }
+//     if (!out)
+//     {
+//         cerr << "Could not open output file !" << endl;
+//         return false;
+//     }
 
-    dvector &f = solver.phi;
+//     dvector &f = solver.phi;
 
-    // out << "x,y\n"; // write header
-    for (int i = 0; i < f.size(); i++)
-    {
-        double x = world.X(i);
-        out << x << "," << f[i] << endl;
-    }
-    return true;
-}
+//     // out << "x,y\n"; // write header
+//     for (int i = 0; i < f.size(); i++)
+//     {
+//         double x = world.X(i);
+//         out << x << "," << f[i] << endl;
+//     }
+//     return true;
+// }
 
 bool OUTPUT::output(vector<Species> &species, const World &world_e, const World &world_i, int step)
 {
@@ -160,15 +160,14 @@ void OUTPUT::screenOutput(World &world, vector<Species> &species, APSolver &solv
          << left << setw(7) << "    time:" << right << setw(8) << world.getInsatance()->getRunTime();
     for (Species &sp : species)
         cout << left << setw(7) << "    " << sp.name << ":" << right << setw(8) << sp.gettotalKE();
-    cout << left << setw(7) << "    ELectric energy:"
-         << right << setw(7) << solver.getElectricEnergy();
+    // cout << left << setw(7) << "    ELectric energy:"
+    //      << right << setw(7) << solver.getElectricEnergy();
     cout << endl;
 }
 
 namespace Output
 {
     ofstream f_diag;
-    ofstream EF_diag;
 }
 
 void OUTPUT::diagOutput(World &world, vector<Species> &species, APSolver &solver)
@@ -183,11 +182,10 @@ void OUTPUT::diagOutput(World &world, vector<Species> &species, APSolver &solver
         for (Species &sp : species)
         {
             f_diag << ",totalKE." << sp.name << ",flux." << sp.name
-                   << ",Enflux." << sp.name << ",den." << sp.name
-                   << ",EnOnTarget." << sp.name << ",ErosionRate." << sp.name
-                   << ",SputtingYield." << sp.name;
+                   << ",Enflux." << sp.name << ",den." << sp.name;
         }
-        f_diag << ",ElectricEnergy" << endl;
+        f_diag << endl;
+        // f_diag << ",ElectricEnergy" << endl;
     }
 
     f_diag << world.getTs() * world.getDt(); // sqrt(Const::m_H) ;//* Const::tau_i;
@@ -196,74 +194,13 @@ void OUTPUT::diagOutput(World &world, vector<Species> &species, APSolver &solver
     {
         f_diag << "," << sp.gettotalKE() << ","
                << sp.getPaticleflux() << "," << sp.getEnergyflux() << ","
-               << sp.getNumdensity() << "," << sp.getEnergyOnTarget() << ","
-               << sp.ComputeErosionRate() << "," << sp.ComputeSputtingYield();
+               << sp.getNumdensity();
     }
 
     // 输出电场能项
-    f_diag << "," << solver.getElectricEnergy();
+    // f_diag << "," << solver.getElectricEnergy();
 
     f_diag << "\n"; // use \n to avoid flush to disc
     if (world.getTs() % 10 == 0)
         f_diag.flush();
 }
-
-void OUTPUT::writeEF(APSolver &solver, World &world)
-{
-    using namespace Output;
-
-    // 判断是否打开
-    if (!EF_diag.is_open())
-        EF_diag.open("EF/EF_diags.dat"); // write EF
-
-    dvector &f = solver.E;
-
-    // out << "x,y\n"; // write header
-    for (int i = 0; i < f.size(); i++)
-    {
-        EF_diag << f[i];
-        if (i < f.size() - 1)
-            EF_diag << " ";
-    }
-    EF_diag << "\n";
-    if (world.getTs() % 10 == 0)
-        EF_diag.flush();
-}
-
-// bool OUTPUT::outputGrid(const World &world)
-// {
-//     ofstream outx("Grid/x.txt");
-//     ofstream outv("Grid/v.txt");
-
-//     if (!outx || !outv)
-//     {
-//         cerr << "CON NOT GENERATE GRID FILE !!!" << endl;
-//         return false;
-//     }
-
-//     int ni = world.ni;
-//     int nj = world.nj;
-
-//     for (int j = 0; j < nj; j++)
-//     {
-//         for (int i = 0; i < ni; i++)
-//         {
-//             double x = world.X(i);
-//             double v = world.V(j);
-//             outx << x;
-//             outv << v;
-//             if (i < ni - 1)
-//             {
-//                 outx << ",";
-//                 outv << ",";
-//             }
-//         }
-//         outx << endl;
-//         outv << endl;
-//     }
-
-//     outx.close();
-//     outv.close();
-
-//     return true;
-// }

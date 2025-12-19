@@ -7,7 +7,6 @@ void ShiftX::computeFlux()
     {
         for (int i = 0; i < ni; ++i)
             computeFlux(i, j);
-        // cout << endl;
     }
 }
 
@@ -51,15 +50,12 @@ void ShiftX::computeFlux(int i, int j)
             sum = sumFrmk2J(Ci + 1, world.xIdx(Cj - 1), j);
         }
         flux[i][j] = flux_calc->computeFluxHighOrder(stencil, velocity, world.getDx(), dt, alpha, maxlimiter[j], sum);
-        // flux[i][j] = (flux[i][j] < 1e-10) ? 0. : flux[i][j];
-        // cout << flux[i][j] << "...";
     }
     else
     {
         join[0] = i, join[1] = j;
         collectStencil(velocity, join, stencil);
         flux[i][j] = flux_calc->computeFlux(stencil, velocity, world.getDx(), dt);
-        // cout << flux[i][j] << "...";
     }
 }
 
@@ -182,7 +178,6 @@ void ShiftV::computeFlux(int i, int j)
         join[0] = i, join[1] = j;
         collectStencil(velocity, join, stencil);
         flux[i][j] = flux_calc->computeFlux(stencil, velocity, world.getDv(), dt);
-        // cout << flux[i][j] << "...";
     }
 }
 
