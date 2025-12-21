@@ -182,7 +182,7 @@ public:
             flux += rat2 * dx;
             flux /= dt;
         }
-        else
+        else if (velocity < -1e-30)
         {
             // 上风在右侧：使用 L1, R1重构
             double fL = stencil[0];
@@ -192,6 +192,8 @@ public:
             flux -= rat2 * dx;
             flux /= dt;
         }
+        else
+            flux = 0.;
         return flux;
     }
 
@@ -233,25 +235,27 @@ public:
             double fL = stencil[0];
             double fR = stencil[2];
             double epsL = slopeCorrectorLeft(fL, fLL, rat1);
-            double epsR =slopeCorrectorRight(fR, fL, rat1);
+            double epsR = slopeCorrectorRight(fR, fL, rat1);
             flux *= fL + 1. / 6. * epsR * (1. - alpha / dx) * (2. - alpha / dx) * (fR - fL) +
                     1. / 6. * epsL * (1. - alpha / dx) * (1 + alpha / dx) * (fL - fLL);
             flux += rat2 * dx;
             flux /= dt;
         }
-        else
+        else if (velocity < -1e-30)
         {
             // 上风在右侧：使用 L1, R1重构
             double fL = stencil[0];
             double fR = stencil[2];
             double fRR = stencil[3];
-            double epsL =slopeCorrectorLeft(fR,fL,rat1);
-            double epsR =slopeCorrectorRight(fRR,fR,rat1);
+            double epsL = slopeCorrectorLeft(fR, fL, rat1);
+            double epsR = slopeCorrectorRight(fRR, fR, rat1);
             flux *= fR - 1. / 6. * epsR * (1. - alpha / dx) * (1. + alpha / dx) * (fRR - fR) -
                     1. / 6. * epsL * (2. + alpha / dx) * (1. + alpha / dx) * (fR - fL);
             flux -= rat2 * dx;
             flux /= dt;
         }
+        else
+            flux = 0.;
         return flux;
     }
 

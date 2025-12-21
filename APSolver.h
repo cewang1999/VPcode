@@ -10,7 +10,7 @@ enum SolverType
 {
     AP,
     Thomas,
-    GS,
+    SOR,
     DS
 };
 
@@ -22,12 +22,14 @@ struct Moment
     inline void resize(int n, int nghosts)
     {
         this->nghosts = nghosts;
-        vector.resize(n + nghosts * 2, 0);
+        vector.resize(n + nghosts * 2, 0.);
     }
 
     inline int idx(int i) const { return i + nghosts; }
     inline double val(int i) const { return vector[idx(i)]; }
     inline double &val(int i) { return vector[idx(i)]; }
+
+    dvector &getArray() { return vector; }
 
 private:
     dvector vector;
@@ -49,7 +51,7 @@ private:
     double dt;
 
     // 电场
-    Moment phi, Ef;
+    Moment phi, Ef, phi_old;
     // 计算moment
     Moment rho, nu, nuu, ntol;
 
@@ -122,7 +124,20 @@ private:
         computeNtol();
     }
 
+    // 迭代工具函数
+    double computeResidual();
+
+    // 收敛参数
+    double omega = 1.85;
+    double tolerance = 1e-5;
+    int max_iterations = 10000;
+
+    // 统计
+    int iterations_used;
+    double residual;
+
     bool solverAP();
+    bool solverSOR();
     void assembleMatrix()
     {
         double lamda2 = lamda * lamda;
@@ -174,19 +189,24 @@ public:
         dx = e.getWorld().getDx(), dt = e.getWorld().getDt();
         ni = e.getWorld().ni, nj = e.getWorld().nj;
 
+        rho.resize(ni, nghosts);
+
         if (type == AP)
         {
-            rho.resize(ni, nghosts);
             nu.resize(ni, nghosts);
             nuu.resize(ni, nghosts);
             ntol.resize(ni, nghosts);
+            phi_old.resize(ni, nghosts);
+            a.resize(ni, 0), b.resize(ni, 0), c.resize(ni, 0), d.resize(ni, 0);
         }
 
         phi.resize(ni, nghosts);
         Ef.resize(ni, nghosts);
-        a.resize(ni, 0), b.resize(ni, 0), c.resize(ni, 0), d.resize(ni, 0);
-        c_star.resize(ni, 0), d_star.resize(ni, 0);
 
+        if (!type == AP)
+            a.resize(ni, 1.), b.resize(ni, -2.), c.resize(ni, 1.);
+
+        c_star.resize(ni, 0), d_star.resize(ni, 0);
     }
 
     ~APSolver() {}
@@ -197,6 +217,8 @@ public:
         {
         case AP:
             return solverAP();
+        case SOR:
+            return solverSOR();
         default:
             return false;
         }
