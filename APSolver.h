@@ -14,6 +14,13 @@ enum SolverType
     DS
 };
 
+enum EFboundaryType
+{
+    EF_PERIODIC,
+    EF_NEUMANN,
+    EF_DIRI
+};
+
 struct Moment
 {
     Moment() {}
@@ -64,6 +71,9 @@ private:
     // 工具数组
     dvector a, b, c, d;
     dvector c_star, d_star;
+
+    // 边界条件
+    EFboundaryType bc[2];
 
     // 计算moment的工具函数
     void computeRho()
@@ -129,7 +139,7 @@ private:
 
     // 收敛参数
     double omega = 1.85;
-    double tolerance = 1e-5;
+    double tolerance = 1e-4;
     int max_iterations = 10000;
 
     // 统计
@@ -182,6 +192,35 @@ private:
             Ef.val(i) = -(phi.val(i + 1) - phi.val(i - 1)) / (2. * dx);
     }
 
+    void fillGhostBoundary(int side, EFboundaryType type)
+    {
+        int inner = 0, outer = 0, opps = 0;
+
+        inner = (side == 0) ? 0 : ni - 1;
+        outer = (side == 0) ? inner - 1 : inner + 1;
+
+        switch (type)
+        {
+        case EF_DIRI:
+            phi.val(outer) = -phi.val(inner);
+            break;
+
+        case EF_PERIODIC:
+            opps = (side == 0) ? outer + ni : outer - ni;
+            phi.val(outer) = phi.val(opps);
+            break;
+
+        default:
+            break;
+        }
+    }
+
+    void fillghostCell()
+    {
+        fillGhostBoundary(0, bc[0]);
+        fillGhostBoundary(1, bc[1]);
+    }
+
 public:
     APSolver(std::vector<Species> &species, SolverType type, int nghosts = 1, double lamda = 1e-3) : type(type), species(species), nghosts(nghosts), lamda(lamda)
     {
@@ -198,13 +237,17 @@ public:
             ntol.resize(ni, nghosts);
             phi_old.resize(ni, nghosts);
             a.resize(ni, 0), b.resize(ni, 0), c.resize(ni, 0), d.resize(ni, 0);
+            bc[0] = bc[1] = EF_DIRI;
         }
 
         phi.resize(ni, nghosts);
         Ef.resize(ni, nghosts);
 
         if (!type == AP)
+        {
             a.resize(ni, 1.), b.resize(ni, -2.), c.resize(ni, 1.);
+            bc[0] = bc[1] = EF_PERIODIC;
+        }
 
         c_star.resize(ni, 0), d_star.resize(ni, 0);
     }

@@ -49,7 +49,8 @@ bool APSolver::solverAP()
         phi.val(i) = d_star[i] - c_star[i] * phi.val(i + 1);
     }
 
-    phi.val(-1) = -phi.val(0), phi.val(ni) = -phi.val(ni - 1);
+    // phi.val(-1) = -phi.val(0), phi.val(ni) = -phi.val(ni - 1);
+    fillghostCell();
 
     computeElectricField();
 
@@ -88,7 +89,8 @@ bool APSolver::solverSOR()
             phi.val(i) = (1.0 - omega) * phi.val(i) + omega * phi_jacobi;
         }
 
-        phi.val(-1) = phi.val(ni - 1), phi.val(ni) = phi.val(0);
+        fillghostCell();
+        // phi.val(-1) = phi.val(ni - 1), phi.val(ni) = phi.val(0);
 
         // 检查收敛
         if (iterations_used % 100 == 0)
