@@ -9,6 +9,7 @@
 enum SolverType
 {
     AP,
+    SORAP,
     Thomas,
     SOR,
     DS
@@ -136,11 +137,17 @@ private:
 
     // 迭代工具函数
     double computeResidual();
+    bool is_iterated()
+    {
+        if (type == AP)
+            return true;
+        return false;
+    }
 
-    // 收敛参数
+    // 收敛方法参数
     double omega = 1.85;
     double tolerance = 1e-4;
-    int max_iterations = 10000;
+    int max_iterations = 20000;
 
     // 统计
     int iterations_used;
@@ -148,6 +155,7 @@ private:
 
     bool solverAP();
     bool solverSOR();
+    bool solverSORAP();
     void assembleMatrix()
     {
         double lamda2 = lamda * lamda;
@@ -186,6 +194,30 @@ private:
             }
         }
     }
+    void assembleMatrixForIter()
+    {
+        double lamda2 = lamda * lamda;
+        double dx2 = dx * dx, dt2 = dt * dt;
+        double alphal = 0., alphar = 0.;
+        double grad2Nuu = 0., gradNu = 0., rh = 0., rhs = 0.;
+
+        for (int i = 0; i < ni; ++i)
+        {
+            alphal = 0.5 * (ntol.val(i - 1) + ntol.val(i)) * dt2 + lamda2;
+            alphar = 0.5 * (ntol.val(i) + ntol.val(i + 1)) * dt2 + lamda2;
+
+            rh = dx2 * rho.val(i);
+            grad2Nuu = dx2 * dt2 * (nuu.val(i + 1) - 2. * nuu.val(i) + nuu.val(i - 1)) / dx2;
+            gradNu = dx2 * dt * (nu.val(i + 1) - nu.val(i - 1)) / (2. * dx);
+            rhs = -(grad2Nuu + rh - gradNu);
+
+            a[i] = alphal * 1e6;
+            b[i] = -(alphal + alphar) * 1e6;
+            c[i] = alphar * 1e6;
+            d[i] = rhs * 1e6;
+        }
+    }
+
     void computeElectricField()
     {
         for (int i = 0; i < ni; i++)
@@ -203,6 +235,10 @@ private:
         {
         case EF_DIRI:
             phi.val(outer) = -phi.val(inner);
+            break;
+
+        case EF_NEUMANN:
+            phi.val(outer) = phi.val(inner);
             break;
 
         case EF_PERIODIC:
@@ -230,7 +266,7 @@ public:
 
         rho.resize(ni, nghosts);
 
-        if (type == AP)
+        if (type == AP || type == SORAP)
         {
             nu.resize(ni, nghosts);
             nuu.resize(ni, nghosts);
@@ -243,10 +279,11 @@ public:
         phi.resize(ni, nghosts);
         Ef.resize(ni, nghosts);
 
-        if (!type == AP)
+        if (!type == AP && !type == SORAP)
         {
             a.resize(ni, 1.), b.resize(ni, -2.), c.resize(ni, 1.);
-            bc[0] = bc[1] = EF_PERIODIC;
+            bc[0] = EF_NEUMANN;
+            bc[1] = EF_DIRI;
         }
 
         c_star.resize(ni, 0), d_star.resize(ni, 0);
@@ -262,12 +299,23 @@ public:
             return solverAP();
         case SOR:
             return solverSOR();
+        case SORAP:
+            return solverSORAP();
         default:
             return false;
         }
     }
 
     double getElectricField(int i) const { return Ef.val(i); }
+
+    double getElectricEnergy()
+    {
+        double val = 0;
+        for (int i = 0; i < ni; i++)
+            val += Ef.val(i) * Ef.val(i) * dx;
+
+        return val;
+    }
 };
 
 #endif
