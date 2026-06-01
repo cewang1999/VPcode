@@ -173,25 +173,25 @@ private:
             gradNu = dx2 * dt * (nu.val(i + 1) - nu.val(i - 1)) / (2. * dx);
             rhs = -(grad2Nuu + rh - gradNu);
 
-            if (i == 0)
-            {
-                b[i] = -(alphal + alphar) - alphal;
-                c[i] = alphar;
-                d[i] = rhs;
-            }
-            else if (i == ni - 1)
-            {
-                a[i] = alphal;
-                b[i] = -(alphal + alphar) - alphar;
-                d[i] = rhs;
-            }
-            else
-            {
-                a[i] = alphal;
-                b[i] = -(alphal + alphar);
-                c[i] = alphar;
-                d[i] = rhs;
-            }
+            // if (i == 0)
+            // {
+            //     b[i] = -(alphal + alphar) - alphal;
+            //     c[i] = alphar;
+            //     d[i] = rhs;
+            // }
+            // else if (i == ni - 1)
+            // {
+            //     a[i] = alphal;
+            //     b[i] = -(alphal + alphar) - alphar;
+            //     d[i] = rhs;
+            // }
+            // else
+            // {
+            //     a[i] = alphal;
+            //     b[i] = -(alphal + alphar);
+            //     c[i] = alphar;
+            //     d[i] = rhs;
+            // }
         }
     }
     void assembleMatrixForIter()
@@ -273,7 +273,7 @@ public:
             ntol.resize(ni, nghosts);
             phi_old.resize(ni, nghosts);
             a.resize(ni, 0), b.resize(ni, 0), c.resize(ni, 0), d.resize(ni, 0);
-            bc[0] = bc[1] = EF_DIRI;
+            bc[0] = bc[1] = EF_NEUMANN;
         }
 
         phi.resize(ni, nghosts);
