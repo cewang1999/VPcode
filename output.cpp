@@ -160,8 +160,8 @@ void OUTPUT::screenOutput(World &world, vector<Species> &species, APSolver &solv
          << left << setw(7) << "    time:" << right << setw(8) << world.getInsatance()->getRunTime();
     for (Species &sp : species)
         cout << left << setw(7) << "    " << sp.name << ":" << right << setw(8) << sp.gettotalKE();
-    // cout << left << setw(7) << "    ELectric energy:"
-    //      << right << setw(7) << solver.getElectricEnergy();
+    cout << left << setw(7) << "    ELectric energy:"
+         << right << setw(7) << solver.getElectricEnergy();
     cout << endl;
 }
 
@@ -184,8 +184,8 @@ void OUTPUT::diagOutput(World &world, vector<Species> &species, APSolver &solver
             f_diag << ",totalKE." << sp.name << ",flux." << sp.name
                    << ",Enflux." << sp.name << ",den." << sp.name;
         }
+        f_diag << ",ElectricEnergy" ;
         f_diag << endl;
-        // f_diag << ",ElectricEnergy" << endl;
     }
 
     f_diag << world.getTs() * world.getDt(); // sqrt(Const::m_H) ;//* Const::tau_i;
@@ -198,7 +198,7 @@ void OUTPUT::diagOutput(World &world, vector<Species> &species, APSolver &solver
     }
 
     // 输出电场能项
-    // f_diag << "," << solver.getElectricEnergy();
+    f_diag << "," << solver.getElectricEnergy();
 
     f_diag << "\n"; // use \n to avoid flush to disc
     if (world.getTs() % 10 == 0)
