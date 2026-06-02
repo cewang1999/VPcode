@@ -125,6 +125,9 @@ bool APSolver::solverSORAP()
     residual = 1.0;
     bool converged = false;
 
+    Moment phi_new;
+    phi_new.resize(ni, nghosts); // 和 phi 一样带 ghost，索引方式一致
+
     while (iterations_used < max_iterations && residual > tolerance)
     {
         fillghostCell();
@@ -136,11 +139,17 @@ bool APSolver::solverSORAP()
             double phi_right = phi.val(i + 1);
             double rhs = d[i]; //-(1. + rho.val(i));
 
-            double phi_jacobi = (a[i] * phi_left + c[i] * phi_right - rhs) / (-b[i]);
+            phi_new.val(i) = (a[i] * phi_left + c[i] * phi_right - d[i]) / (-b[i]);
+
+            // double phi_jacobi = (a[i] * phi_left + c[i] * phi_right - rhs) / (-b[i]);
 
             // SOR 更新
-            phi.val(i) = (1.0 - omega) * phi.val(i) + omega * phi_jacobi;
+            // phi.val(i) = (1.0 - omega) * phi.val(i) + omega * phi_jacobi;
         }
+
+        // 整体写回 phi
+        for (int i = 0; i < ni; i++)
+            phi.val(i) = phi_new.val(i);
 
         fillghostCell();
         // phi.val(-1) = phi.val(ni - 1), phi.val(ni) = phi.val(0);
