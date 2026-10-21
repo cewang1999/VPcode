@@ -61,94 +61,22 @@ bool Species::Initialize()
 
 double Species::getPaticleflux()
 {
-    double flux = 0;
-    const double M = world.nj;
-    const double N = world.ni;
-    double dv = world.getDv();
-
-    // if (name == "e-")
-    // {
-    //     for (int j = M / 2; j < M - 1; j++)
-    //     {
-    //         double v1 = world.V(j);
-    //         double v2 = world.V(j + 1);
-
-    //         flux += 0.5 * 0.86 * (f[N - 1][j] * v1 + f[N - 1][j + 1] * v2) * dv;
-    //     }
-    // }
-    // else
-    // {
-    //     for (int j = 0; j < M - 1; j++)
-    //     {
-    //         double v1 = world.V(j);
-    //         double v2 = world.V(j + 1);
-
-    //         flux += 0.5 * (f[N - 1][j] * v1 + f[N - 1][j + 1] * v2) * dv;
-    //     }
-    // }
-
-    for (int j = 0; j < M; ++j)
-    {
-        double v = world.V(j);
-        if (v < 1e-30)
-            flux -= F(0, j) * v * dv;
-    }
-
-    return flux * sqrt(mass); //* n_elm * V_Te * sin_theta; // 含修正 归一化系数：(n_e*v_Te)
+    return wallFlux * sqrt(Const::m_H); // 归一化系数：(n_elm*v_Ti)
 }
 
 double Species::getEnergyflux()
 {
-    double flux = 0;
-    const double M = world.nj;
-    const double N = world.ni;
-    double dv = world.getDv();
-
-    double flux_t1 = 0;
-    double flux_t2 = 0;
-    double flux_total = 0;
-
-    if (name == "e-")
-    {
-        for (int j = M / 2; j < M; j++)
-        {
-            double v = world.V(j);
-
-            flux += 0.5 * (f[N - 1][j] * v * v * v) * dv;
-            flux += 0.86 * (f[N - 1][j] * v) * dv;
-        }
-    }
-    else
-    {
-
-        for (int j = 0; j < M; j++)
-        {
-            double v = world.V(j);
-
-            flux += 0.5 * mass * (f[N - 1][j] * v * v * v) * dv * sqrt(mass);
-            flux += f[N - 1][j] * v * dv * sqrt(mass);
-        }
-    }
-
-    return flux; //* n_elm * T_elm * QE * V_Te * sin_theta; // 含修正 归一化系数：(n_e*T_ELM*v_Te)
+    return wallEnergyFlux * sqrt(Const::m_H); // 归一化系数：(n_elm*T_elm*v_Ti)
 }
 
 double Species::getNumdensity()
 {
+    // 贴壁网格 (右壁, i = ni-1) 的密度
     double den = 0;
-    const double M = world.nj;
-    const double N = world.ni;
     double dv = world.getDv();
-    for (int j = 0; j < M - 1; j++)
-    {
-        if (name == "e-")
-        {
-            den += 0.5 * 0.5 * (f[N - 1][j] + f[N - 1][j + 1]) * dv; // 含修正0.5
-            continue;
-        }
-        den += 0.5 * (f[N - 1][j] + f[N - 1][j + 1]) * dv;
-    }
-    return den; // 含修正
+    for (int j = 0; j < world.nj; j++)
+        den += F(world.ni - 1, j) * dv;
+    return den;
 }
 
 double Species::gettotalKE()

@@ -28,6 +28,7 @@ void ShiftX::computeFlux(int i, int j)
             int Ci = L[0];
             double xRi = x[Ci] + 0.5 * world.getDx();
             double X = xRi - dt * velocity;
+            X = std::min(std::max(X, world.getXmin() - world.getDx()), world.getXmax() + world.getDx()); // 出口外 f=0
             int Cj = findCell(X);
             int jrx = cell_Join(Cj, 1);
             join[0] = jrx, join[1] = j;
@@ -41,6 +42,7 @@ void ShiftX::computeFlux(int i, int j)
             int Ci = L[0];
             double xRi = x[Ci] + 0.5 * world.getDx();
             double X = xRi - dt * velocity;
+            X = std::min(std::max(X, world.getXmin() - world.getDx()), world.getXmax() + world.getDx()); // 出口外 f=0
             int Cj = findCell(X);
             int jlx = cell_Join(Cj, 0);
             join[0] = jlx, join[1] = j;
@@ -113,12 +115,29 @@ void ShiftX::updateInteriorCells()
         }
 }
 
+void ShiftX::computeWallFlux()
+{
+    // 壁面面通量即真实流出量（净通量，含被鞘层反射回去的部分）；取左右两壁平均
+    double dv = world.getDv();
+    double gamma = 0., q = 0.;
+    for (int j = 0; j < nj; ++j)
+    {
+        double v = world.V(j);
+        double out = 0.5 * (flux[ni - 1][j] - flux[0][j]) * dv;
+        gamma += out;
+        q += out * (0.5 * sp.mass * v * v + 1.); // Q_par + Q_perp(=Γ T_ELM)
+    }
+    sp.wallFlux = gamma;
+    sp.wallEnergyFlux = q;
+}
+
 void ShiftX::advection()
 {
     if (flux_calc->isHighOrder())
         computMaxLimiter();
     fillGhostCells();
     computeFlux();
+    computeWallFlux();
     updateInteriorCells();
     fillGhostCells();
 }
@@ -150,6 +169,7 @@ void ShiftV::computeFlux(int i, int j)
             int Ci = L[1];
             double xRi = v[Ci] + 0.5 * world.getDv();
             double X = xRi - dt * velocity;
+            X = std::min(std::max(X, world.getVmin() - world.getDv()), world.getVmax() + world.getDv());
             int Cj = findCell(X);
             int jrx = cell_Join(Cj, 1);
             join[0] = i, join[1] = jrx;
@@ -163,6 +183,7 @@ void ShiftV::computeFlux(int i, int j)
             int Ci = L[1];
             double xRi = v[Ci] + 0.5 * world.getDv();
             double X = xRi - dt * velocity;
+            X = std::min(std::max(X, world.getVmin() - world.getDv()), world.getVmax() + world.getDv());
             int Cj = findCell(X);
             int jlx = cell_Join(Cj, 0);
             join[0] = i, join[1] = jlx;

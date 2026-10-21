@@ -173,25 +173,21 @@ private:
             gradNu = dx2 * dt * (nu.val(i + 1) - nu.val(i - 1)) / (2. * dx);
             rhs = -(grad2Nuu + rh - gradNu);
 
-            // if (i == 0)
-            // {
-            //     b[i] = -(alphal + alphar) - alphal;
-            //     c[i] = alphar;
-            //     d[i] = rhs;
-            // }
-            // else if (i == ni - 1)
-            // {
-            //     a[i] = alphal;
-            //     b[i] = -(alphal + alphar) - alphar;
-            //     d[i] = rhs;
-            // }
-            // else
-            // {
-            //     a[i] = alphal;
-            //     b[i] = -(alphal + alphar);
-            //     c[i] = alphar;
-            //     d[i] = rhs;
-            // }
+            a[i] = alphal;
+            b[i] = -(alphal + alphar);
+            c[i] = alphar;
+            d[i] = rhs;
+            // 边界: 幽灵点 phi_g = s*phi_inner, s=-1 Dirichlet(壁面phi=0), s=+1 Neumann
+            if (i == 0)
+            {
+                b[i] += (bc[0] == EF_DIRI ? -1. : 1.) * a[i];
+                a[i] = 0.;
+            }
+            if (i == ni - 1)
+            {
+                b[i] += (bc[1] == EF_DIRI ? -1. : 1.) * c[i];
+                c[i] = 0.;
+            }
         }
     }
     void assembleMatrixForIter()
@@ -273,7 +269,7 @@ public:
             ntol.resize(ni, nghosts);
             phi_old.resize(ni, nghosts);
             a.resize(ni, 0), b.resize(ni, 0), c.resize(ni, 0), d.resize(ni, 0);
-            bc[0] = bc[1] = EF_NEUMANN;
+            bc[0] = bc[1] = EF_DIRI; // 靶板接地 phi(±L)=0，与文献一致；Neumann 下鞘层无法形成
         }
 
         phi.resize(ni, nghosts);

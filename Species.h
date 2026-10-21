@@ -66,6 +66,8 @@ public:
     double pw;              // 粒子权重
     double angle;           // 打击角
     Field f;                // 粒子分布
+    double wallFlux = 0.;       // 壁面净粒子流 (n_elm*v_Te)，由 ShiftX 更新
+    double wallEnergyFlux = 0.; // 壁面净能流 (n_elm*T_elm*v_Te)，由 ShiftX 更新
     dvector Maxwell;        // 垂直速度分布
 
     // topo : Log -> memory

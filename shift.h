@@ -34,7 +34,6 @@ public:
         ni = world.ni + 1;
         nj = world.nj;
         maxlimiter.resize(nj, 0);
-        dt = dt * 0.5; // half step for 2nd accuracy on time
     }
     ~ShiftX() {}
 
@@ -46,6 +45,8 @@ public:
     void advection();
 
 private:
+    void computeWallFlux(); // 由壁面数值通量求净粒子流/能流，存入 sp
+
     // flux的内部存储与join连接，这里的flux垂直于x ｜——｜——｜
     Field flux;
     dvector maxlimiter;

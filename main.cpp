@@ -56,13 +56,14 @@ int main(int argc, char *argv[])
                 OUTPUT::outputGrid(world);
         }
 
-        solver.solve(); // 求解电势
+        solver.solve(); // 由 f^n 求 phi^{n+1}
+
+        // AP 格式要求先用 E^{n+1} 修正速度（电流），再做空间输运，见文献 (A.5)-(A.6)、(B.1)
+        eShiftv.advection();
+        iShiftv.advection();
 
         eShiftx.advection();
         iShiftx.advection();
-
-        eShiftv.advection();
-        iShiftv.advection();
 
         // eShiftx.advection();
         // iShiftx.advection();
