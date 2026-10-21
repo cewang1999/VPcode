@@ -57,6 +57,9 @@ public:
     /*求靶板上能流*/
     double getEnergyflux();
 
+    /*贴壁网格值 × v（出射方向），与 kobra 的 wallinfo 诊断相同*/
+    double getCellflux();
+
     /*求靶板上密度信息*/
     double getNumdensity();
 
@@ -68,6 +71,7 @@ public:
     Field f;                // 粒子分布
     double wallFlux = 0.;       // 壁面净粒子流 (n_elm*v_Te)，由 ShiftX 更新
     double wallEnergyFlux = 0.; // 壁面净能流 (n_elm*T_elm*v_Te)，由 ShiftX 更新
+    double wallFluxCell = 0.;   // 同一时刻 "贴壁网格值 × v" (出射方向), 由 ShiftX 更新
     dvector Maxwell;        // 垂直速度分布
 
     // topo : Log -> memory

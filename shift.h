@@ -34,6 +34,7 @@ public:
         ni = world.ni + 1;
         nj = world.nj;
         maxlimiter.resize(nj, 0);
+        upwindWall = (Const::wallFace == "upwind1");
     }
     ~ShiftX() {}
 
@@ -52,6 +53,7 @@ private:
     dvector maxlimiter;
     int ni;
     int nj;
+    bool upwindWall; // 壁面出射面值取贴壁网格值（一阶，同 kobra）
 
     // 逻辑链接：仅限X方向的链接,链接的左右cell
     vec2<int> leftCell(const int i, const int j)
@@ -157,11 +159,9 @@ protected:
     int ni;
     int nj;
 
-    void computMaxLimiter();
-    void fillGhostCells() { return sp.fillGhostCellsV(); } // 填充 X 方向幽灵网格，call to Specie 函数
-    void computeFlux();                                    // 计算 X 方向 Flux
-    void computeFlux(int i, int j);                        // 计算 (i,j) 处 Flux
-    void updateInteriorCells();                            // 填充 X 方向所有网格
+    void fillGhostRow(int i);                      // 填充第 i 行 V 方向幽灵网格 (Neumann)
+    void advectRow(int i, double dtl);             // 第 i 行推进 dtl
+    void computeFlux(int i, int j, double dtl);    // 计算 (i,j) 处 Flux
 
     // double getElectricField(int i) { return world.X(i); } // 委托给solver
     double getElectricField(int i) const { return solver.getElectricField(i); }

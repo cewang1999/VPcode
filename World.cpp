@@ -29,6 +29,11 @@ namespace Const
 	double V_Ti = sqrt(T_elm * QE / m_H / ME);
 	double tau_i = L_par / V_Ti;
 	string type;
+	double lamda = 1e-3;
+	string wallFace = "PFC3";
+	double vcfl = 0.;
+	int outDiag = 10;
+	int outF = 100;
 }
 
 void Const::readConst(string no)
@@ -38,6 +43,11 @@ void Const::readConst(string no)
 	string comm;
 	string param;
 	ifstream in_file(filename);
+	if (!in_file)
+	{
+		cerr << "Failed to open file: " << filename << endl;
+		exit(1);
+	}
 
 	while (getline(in_file, line))
 	{
@@ -65,6 +75,16 @@ void Const::readConst(string no)
 			record >> Const::theta;
 		else if (param == "SolverType")
 			record >> Const::type;
+		else if (param == "lambda")
+			record >> Const::lamda;
+		else if (param == "WallFace")
+			record >> Const::wallFace;
+		else if (param == "VCFL")
+			record >> Const::vcfl;
+		else if (param == "OutDiag")
+			record >> Const::outDiag;
+		else if (param == "OutF")
+			record >> Const::outF;
 		else
 			continue;
 	}

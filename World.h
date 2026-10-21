@@ -45,6 +45,13 @@ namespace Const
 	// 求解器类型
 	extern std::string type;
 
+	// 数值选项（case 文件可选参数，缺省值见 World.cpp）
+	extern double lamda;		  // λ = λ_D / L_par
+	extern std::string wallFace; // 壁面出射面值: PFC3 (重构) 或 upwind1 (面值 = 贴壁网格值, 同 kobra)
+	extern double vcfl;			  // v 方向子循环 CFL 上限, 0 表示不子循环
+	extern int outDiag;			  // runtime_diags.csv 输出间隔 (步)
+	extern int outF;			  // 电子分布函数输出间隔 (步), 0 表示不输出
+
 	void printMyself();
 	void readConst(string no);
 }

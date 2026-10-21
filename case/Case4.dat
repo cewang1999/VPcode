@@ -1,0 +1,17 @@
+# Const number
+
+L           55
+n           3.2e19
+T           150
+sigma       10
+Nx          1000
+Nv          256
+theta       90
+SolverType  AP
+dt          0.004
+num_ts      42850
+lambda      0.001
+WallFace    PFC3
+VCFL        0
+OutDiag     10
+OutF        4285

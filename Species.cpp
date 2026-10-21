@@ -69,6 +69,11 @@ double Species::getEnergyflux()
     return wallEnergyFlux * sqrt(Const::m_H); // 归一化系数：(n_elm*T_elm*v_Ti)
 }
 
+double Species::getCellflux()
+{
+    return wallFluxCell * sqrt(Const::m_H); // 归一化系数：(n_elm*v_Ti)
+}
+
 double Species::getNumdensity()
 {
     // 贴壁网格 (右壁, i = ni-1) 的密度
@@ -118,24 +123,12 @@ double Species::gettotalKE()
 
 double Species::gettotalnumber()
 {
-    int N = world.ni; // 列数
-    int M = world.nj; // 行数
-
-    double dv = world.getDv();
-    double dx = world.getDx();
-
     double val = 0;
+    for (int i = 0; i < world.ni; i++)
+        for (int j = 0; j < world.nj; j++)
+            val += F(i, j);
 
-    for (int i = 0; i < N - 1; i++)
-        for (int j = 0; j < M - 1; j++)
-        {
-            double v1 = world.V(j);
-            double v2 = world.V(j + 1);
-
-            val += 0.25 * (f[i][j] + f[i][j + 1] + f[i + 1][j] + f[i + 1][j + 1]) * dx * dv;
-        }
-
-    return val;
+    return val * world.getDx() * world.getDv(); // 归一化系数：(n_elm*L_par)
 }
 
 // 边界设置

@@ -182,7 +182,8 @@ void OUTPUT::diagOutput(World &world, vector<Species> &species, APSolver &solver
         for (Species &sp : species)
         {
             f_diag << ",totalKE." << sp.name << ",flux." << sp.name
-                   << ",Enflux." << sp.name << ",den." << sp.name;
+                   << ",Enflux." << sp.name << ",den." << sp.name
+                   << ",flux1." << sp.name << ",N." << sp.name;
         }
         f_diag << ",ElectricEnergy" ;
         f_diag << endl;
@@ -194,13 +195,14 @@ void OUTPUT::diagOutput(World &world, vector<Species> &species, APSolver &solver
     {
         f_diag << "," << sp.gettotalKE() << ","
                << sp.getPaticleflux() << "," << sp.getEnergyflux() << ","
-               << sp.getNumdensity();
+               << sp.getNumdensity() << "," << sp.getCellflux() << ","
+               << sp.gettotalnumber();
     }
 
     // 输出电场能项
     f_diag << "," << solver.getElectricEnergy();
 
     f_diag << "\n"; // use \n to avoid flush to disc
-    if (world.getTs() % 10 == 0)
+    if (world.getTs() % (10 * Const::outDiag) == 0)
         f_diag.flush();
 }

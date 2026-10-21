@@ -80,6 +80,7 @@ private:
     void computeRho()
     {
 
+#pragma omp parallel for schedule(static)
         for (int i = -nghosts; i < ni + nghosts; ++i)
         {
             rho.val(i) = 0;
@@ -91,6 +92,7 @@ private:
     void computeNu()
     {
 
+#pragma omp parallel for schedule(static)
         for (int i = -nghosts; i < ni + nghosts; ++i)
         {
             nu.val(i) = 0;
@@ -105,6 +107,7 @@ private:
     void computeNuu()
     {
 
+#pragma omp parallel for schedule(static)
         for (int i = -nghosts; i < ni + nghosts; ++i)
         {
             nuu.val(i) = 0;
@@ -119,6 +122,7 @@ private:
     void computeNtol()
     {
 
+#pragma omp parallel for schedule(static)
         for (int i = -nghosts; i < ni + nghosts; ++i)
         {
             ntol.val(i) = 0.;

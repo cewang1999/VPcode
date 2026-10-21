@@ -17,7 +17,7 @@ using namespace Const;
 
 int main(int argc, char *argv[])
 {
-    string Case = "2";
+    string Case = (argc > 1) ? argv[1] : "2"; // 用法: ./vp <case 编号>，读取 case/Case<编号>.dat
     Const::readConst(Case);
     // Const::printMyself();
     // World::printMySelf();
@@ -40,7 +40,16 @@ int main(int argc, char *argv[])
     sources.emplace_back(new DeltaTimeSource(e, world, 1. / Const::sigma));
     sources.emplace_back(new DeltaTimeSource(D, world_D, 1. / Const::sigma));
 
-    APSolver solver(species, stringToEnum(Const::type));
+    APSolver solver(species, stringToEnum(Const::type), 1, Const::lamda);
+
+    {
+        double cflx = world.getVmax() * world.getDt() / world.getDx();
+        cout << "Case" << Case << ": Nx=" << Nx << " Nv=" << Nv << " dt=" << world.getDt()
+             << " lambda=" << Const::lamda << " WallFace=" << Const::wallFace << " VCFL=" << Const::vcfl
+             << " | electron x-CFL(v_max)=" << cflx << endl;
+        if (Const::wallFace == "upwind1" && cflx > 1.)
+            cerr << "WARNING: WallFace upwind1 requires x-CFL < 1" << endl;
+    }
 
     ShiftX eShiftx(e), iShiftx(D);
     ShiftV eShiftv(e, solver), iShiftv(D, solver);
@@ -48,9 +57,10 @@ int main(int argc, char *argv[])
     while (world.advanceNextStep())
     {
 
-        if (world.getTs() % 10 == 0)
+        if (world.getTs() % Const::outDiag == 0)
         {
-            OUTPUT::screenOutput(world, species, solver);
+            if (world.getTs() % (100 * Const::outDiag) == 0)
+                OUTPUT::screenOutput(world, species, solver);
             OUTPUT::diagOutput(world, species, solver);
             if (world.getTs() == 0)
                 OUTPUT::outputGrid(world);
@@ -71,7 +81,7 @@ int main(int argc, char *argv[])
         // eShiftx.advection();
         // iShiftx.advection();
 
-        if (world.getTs() % 100 == 0)
+        if (Const::outF > 0 && world.getTs() % Const::outF == 0)
         {
             // OUTPUT::output(D.f, world_D, world.getTs());
             OUTPUT::output(e.f, world, world.getTs());
