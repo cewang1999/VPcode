@@ -45,7 +45,7 @@ int main(int argc, char *argv[])
     {
         double cflx = world.getVmax() * world.getDt() / world.getDx();
         cout << "Case" << Case << ": Nx=" << Nx << " Nv=" << Nv << " dt=" << world.getDt()
-             << " lambda=" << Const::lamda << " WallFace=" << Const::wallFace << " VCFL=" << Const::vcfl
+             << " lambda=" << Const::lamda << " WallFace=" << Const::wallFace << " WallE=" << Const::wallE << " VCFL=" << Const::vcfl
              << " | electron x-CFL(v_max)=" << cflx << endl;
         if (Const::wallFace == "upwind1" && cflx > 1.)
             cerr << "WARNING: WallFace upwind1 requires x-CFL < 1" << endl;

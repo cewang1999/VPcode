@@ -66,6 +66,9 @@ private:
     // 准中性条件
     double lamda = 1e-3;
 
+    // 壁面电场离散 (Const::wallE == "onesided")
+    bool onesided = false;
+
     // 计算类型
     SolverType type;
 
@@ -171,6 +174,14 @@ private:
         {
             alphal = 0.5 * (ntol.val(i - 1) + ntol.val(i)) * dt2 + lamda2;
             alphar = 0.5 * (ntol.val(i) + ntol.val(i + 1)) * dt2 + lamda2;
+            if (onesided)
+            {
+                // 吸收壁面上的电流不由电场驱动：壁面面系数只保留 λ²（纯泊松），保证离散高斯定律
+                if (i == 0)
+                    alphal = lamda2;
+                if (i == ni - 1)
+                    alphar = lamda2;
+            }
 
             rh = dx2 * rho.val(i);
             grad2Nuu = dx2 * dt2 * (nuu.val(i + 1) - 2. * nuu.val(i) + nuu.val(i - 1)) / dx2;
@@ -222,6 +233,12 @@ private:
     {
         for (int i = 0; i < ni; i++)
             Ef.val(i) = -(phi.val(i + 1) - phi.val(i - 1)) / (2. * dx);
+        if (onesided)
+        {
+            // 贴壁格只用等离子体内侧的电势梯度，不把网格中心到壁面的电势降加给网格平均分布
+            Ef.val(0) = -(phi.val(1) - phi.val(0)) / dx;
+            Ef.val(ni - 1) = -(phi.val(ni - 1) - phi.val(ni - 2)) / dx;
+        }
     }
 
     void fillGhostBoundary(int side, EFboundaryType type)
@@ -262,6 +279,7 @@ public:
     {
         Species &e = species[0];
         dx = e.getWorld().getDx(), dt = e.getWorld().getDt();
+        onesided = (Const::wallE == "onesided");
         ni = e.getWorld().ni, nj = e.getWorld().nj;
 
         rho.resize(ni, nghosts);

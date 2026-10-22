@@ -34,6 +34,7 @@ namespace Const
 	double vcfl = 0.;
 	int outDiag = 10;
 	int outF = 100;
+	string wallE = "central";
 }
 
 void Const::readConst(string no)
@@ -85,6 +86,8 @@ void Const::readConst(string no)
 			record >> Const::outDiag;
 		else if (param == "OutF")
 			record >> Const::outF;
+		else if (param == "WallE")
+			record >> Const::wallE;
 		else
 			continue;
 	}
