@@ -47,4 +47,6 @@ tail -f runs/Case4/log.txt
 - `nw.<sp>` / `Tw.<sp>`：壁面密度 / 平行温度（文献图 7），由壁面分布 f_wall = 面通量 / v（出射方向）、入射方向为 0 求得
 - `den.<sp>`：贴壁网格密度（网格中心，含被反射的电子，不是壁面值）；`totalKE.<sp>`：总动能；最后一列 `ElectricEnergy`
 
-画图：`~/plotenv/bin/python plot/FluxComparison.py runs/Case5/runtime_diags.csv runs/Case5`
+画图：
+- `~/plotenv/bin/python plot/PaperFigs.py runs/Case4 [runs/Case12 ...]`：按文献坐标轴画图 1、图 7 和 Γe/Γi − 1，图存在运行目录（多个目录时存在 runs/）
+- `~/plotenv/bin/python plot/FluxComparison.py runs/Case5/runtime_diags.csv runs/Case5`
