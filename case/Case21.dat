@@ -1,0 +1,18 @@
+# Const number
+
+L           55
+n           3.2e19
+T           150
+sigma       10
+Nx          2000
+Nv          256
+theta       90
+SolverType  AP
+dt          0.002
+num_ts      85700
+lambda      0.001
+WallFace    PFC3
+VCFL        0
+OutDiag     20
+OutF        8570
+WallE       onesided

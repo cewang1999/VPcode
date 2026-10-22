@@ -51,6 +51,7 @@ namespace Const
 	extern double vcfl;			  // v 方向子循环 CFL 上限, 0 表示不子循环
 	extern int outDiag;			  // runtime_diags.csv 输出间隔 (步)
 	extern int outF;			  // 电子分布函数输出间隔 (步), 0 表示不输出
+	extern int eFilter;			  // 内部电场 (1,2,1)/4 二项式滤波次数 (不动贴壁 2 格), 0 表示不滤波
 	extern std::string wallE;	  // 壁面电场离散: central (原方案), onesided (贴壁格单侧电场 + 壁面面系数仅 λ²), kobra (同 quasi-kobra)
 
 	void printMyself();

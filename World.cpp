@@ -35,6 +35,7 @@ namespace Const
 	int outDiag = 10;
 	int outF = 100;
 	string wallE = "central";
+	int eFilter = 0;
 }
 
 void Const::readConst(string no)
@@ -88,6 +89,8 @@ void Const::readConst(string no)
 			record >> Const::outF;
 		else if (param == "WallE")
 			record >> Const::wallE;
+		else if (param == "EFilter")
+			record >> Const::eFilter;
 		else
 			continue;
 	}

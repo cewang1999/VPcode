@@ -298,6 +298,15 @@ private:
             Ef.val(0) = -(phi.val(1) - phi.val(0)) / dx;
             Ef.val(ni - 1) = -(phi.val(ni - 1) - phi.val(ni - 2)) / dx;
         }
+        // 抑制栅格尺度 (2dx) 模：内部电场二项式滤波，贴壁 2 格保持不变
+        for (int pass = 0; pass < Const::eFilter; ++pass)
+        {
+            dvector e0(ni);
+            for (int i = 0; i < ni; i++)
+                e0[i] = Ef.val(i);
+            for (int i = 2; i < ni - 2; i++)
+                Ef.val(i) = 0.25 * e0[i - 1] + 0.5 * e0[i] + 0.25 * e0[i + 1];
+        }
     }
 
     void fillGhostBoundary(int side, EFboundaryType type)
