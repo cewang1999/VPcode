@@ -394,6 +394,12 @@ public:
     }
 
     double getElectricField(int i) const { return Ef.val(i); }
+    // 诊断用：电势与 AP 方程所用的矩 (i 可取 -1 与 ni)
+    double getPhi(int i) const { return phi.val(i); }
+    double getRho(int i) const { return rho.val(i); }
+    double getNu(int i) const { return nu.val(i); }
+    double getNuu(int i) const { return nuu.val(i); }
+    double getNtol(int i) const { return ntol.val(i); }
 
     double getElectricEnergy()
     {

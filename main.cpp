@@ -45,11 +45,13 @@ int main(int argc, char *argv[])
     {
         double cflx = world.getVmax() * world.getDt() / world.getDx();
         cout << "Case" << Case << ": Nx=" << Nx << " Nv=" << Nv << " dt=" << world.getDt()
-             << " lambda=" << Const::lamda << " WallFace=" << Const::wallFace << " WallE=" << Const::wallE << " EFilter=" << Const::eFilter << " VCFL=" << Const::vcfl
+             << " lambda=" << Const::lamda << " WallFace=" << Const::wallFace << " WallE=" << Const::wallE << " EFilter=" << Const::eFilter << " SpikeDump=" << Const::spikeDump << " VCFL=" << Const::vcfl
              << " | electron x-CFL(v_max)=" << cflx << endl;
         if (Const::wallFace == "upwind1" && cflx > 1.)
             cerr << "WARNING: WallFace upwind1 requires x-CFL < 1" << endl;
     }
+
+    OUTPUT::SpikeDump spike(world, species, solver);
 
     ShiftX eShiftx(e), iShiftx(D);
     ShiftV eShiftv(e, solver), iShiftv(D, solver);
@@ -67,6 +69,7 @@ int main(int argc, char *argv[])
         }
 
         solver.solve(); // 由 f^n 求 phi^{n+1}
+        spike.check(world.getTs());
 
         // AP 格式要求先用 E^{n+1} 修正速度（电流），再做空间输运，见文献 (A.5)-(A.6)、(B.1)
         eShiftv.advection();

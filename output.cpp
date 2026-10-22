@@ -2,6 +2,7 @@
 #include <sstream>
 #include <iostream>
 #include <iomanip>
+#include <filesystem>
 #include "output.h"
 
 using namespace std;
@@ -206,4 +207,90 @@ void OUTPUT::diagOutput(World &world, vector<Species> &species, APSolver &solver
     f_diag << "\n"; // use \n to avoid flush to disc
     if (world.getTs() % (10 * Const::outDiag) == 0)
         f_diag.flush();
+}
+bool OUTPUT::writeField(const string &name, const Field &f, const World &world)
+{
+    ofstream out(name);
+    if (!out)
+    {
+        cerr << "Could not open output file " << name << endl;
+        return false;
+    }
+    out << setprecision(10);
+    for (int j = 0; j < world.nj; j++)
+    {
+        for (int i = 0; i < world.ni; i++)
+        {
+            out << f(world.xIdx(i), world.vIdx(j));
+            if (i < world.ni - 1)
+                out << ",";
+        }
+        out << "\n";
+    }
+    return true;
+}
+
+OUTPUT::SpikeDump::SpikeDump(World &world, vector<Species> &species, APSolver &solver)
+    : world(world), species(species), solver(solver)
+{
+    if (Const::spikeDump <= 0.)
+        return;
+    for (Species &sp : species)
+        prev.emplace_back(sp.f);
+    std::filesystem::create_directories("spike");
+}
+
+void OUTPUT::SpikeDump::check(int ts)
+{
+    if (Const::spikeDump <= 0. || events >= maxEvents)
+        return;
+
+    // 本步场剖面 (由 f^n 求得的 phi^{n+1}, E^{n+1})
+    for (int i = -1; i <= world.ni; i++)
+    {
+        double E = (i >= 0 && i < world.ni) ? solver.getElectricField(i) : 0.;
+        ring.push_back({(double)ts, (double)i, world.X(i), solver.getPhi(i), E, solver.getRho(i),
+                        solver.getNu(i), solver.getNuu(i), solver.getNtol(i)});
+    }
+    size_t rows = (size_t)(world.ni + 2);
+    while (ring.size() > 2 * K * rows)
+        ring.erase(ring.begin(), ring.begin() + rows);
+
+    double W = solver.getElectricEnergy();
+    if (post < 0 && ts > 100 && wPrev > 0. && W > Const::spikeDump * wPrev)
+    {
+        trigTs = ts;
+        post = K;
+        string pre = "spike/ev" + to_string(events) + "_";
+        for (size_t s = 0; s < species.size(); s++)
+        {
+            string nm = (s == 0) ? "e" : "i";
+            writeField(pre + "f" + nm + "_prev.txt", prev[s], species[s].getWorld()); // f^{n-1}
+            writeField(pre + "f" + nm + "_now.txt", species[s].f, species[s].getWorld()); // f^n
+        }
+        cout << "SpikeDump: event " << events << " at ts=" << ts << " W=" << W << " Wprev=" << wPrev << endl;
+    }
+    if (post >= 0 && post-- == 0)
+        writeProfiles();
+    wPrev = W;
+
+    for (size_t s = 0; s < species.size(); s++)
+    {
+        Field &f = species[s].f;
+        for (int i = 0; i < f.ni; i++)
+            for (int j = 0; j < f.nj; j++)
+                prev[s][i][j] = f(i, j);
+    }
+}
+
+void OUTPUT::SpikeDump::writeProfiles()
+{
+    ofstream out("spike/ev" + to_string(events) + "_prof.csv");
+    out << "# trigger ts=" << trigTs << ", dt=" << world.getDt() << "\nts,i,x,phi,E,rho,J,R,ntol\n";
+    out << setprecision(10);
+    for (auto &r : ring)
+        for (size_t k = 0; k < r.size(); k++)
+            out << r[k] << (k + 1 < r.size() ? "," : "\n");
+    events++;
+    post = -1;
 }

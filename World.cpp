@@ -36,6 +36,7 @@ namespace Const
 	int outF = 100;
 	string wallE = "central";
 	int eFilter = 0;
+	double spikeDump = 0.;
 }
 
 void Const::readConst(string no)
@@ -91,6 +92,8 @@ void Const::readConst(string no)
 			record >> Const::wallE;
 		else if (param == "EFilter")
 			record >> Const::eFilter;
+		else if (param == "SpikeDump")
+			record >> Const::spikeDump;
 		else
 			continue;
 	}
