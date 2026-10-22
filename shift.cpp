@@ -147,6 +147,30 @@ void ShiftX::computeWallFlux()
     sp.wallFlux = gamma;
     sp.wallEnergyFlux = q;
     sp.wallFluxCell = cell;
+
+    // 壁面上的分布: 出射方向 f_wall(v) = 面通量 / v，入射方向为 0（吸收壁）
+    // n_wall = Σ f_wall dv, T_wall = m (<v^2> - <v>^2)；左右两壁分别计算后平均
+    double n2 = 0., t2 = 0.;
+    for (int side = 0; side < 2; ++side)
+    {
+        double n = 0., g = 0., p = 0.;
+        for (int j = 0; j < nj; ++j)
+        {
+            double v = world.V(j);
+            double out = (side == 0) ? -flux[0][j] : flux[ni - 1][j]; // 流出为正
+            if ((side == 0 && v < 0) || (side == 1 && v > 0))
+            {
+                n += out / fabs(v) * dv;
+                g += out * dv;
+                p += out * fabs(v) * dv;
+            }
+        }
+        n2 += 0.5 * n;
+        if (n > 0)
+            t2 += 0.5 * sp.mass * (p / n - (g / n) * (g / n));
+    }
+    sp.wallDensity = n2;
+    sp.wallTemp = t2;
 }
 
 void ShiftX::advection()

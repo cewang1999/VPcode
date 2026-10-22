@@ -183,7 +183,8 @@ void OUTPUT::diagOutput(World &world, vector<Species> &species, APSolver &solver
         {
             f_diag << ",totalKE." << sp.name << ",flux." << sp.name
                    << ",Enflux." << sp.name << ",den." << sp.name
-                   << ",flux1." << sp.name << ",N." << sp.name;
+                   << ",flux1." << sp.name << ",N." << sp.name
+                   << ",nw." << sp.name << ",Tw." << sp.name;
         }
         f_diag << ",ElectricEnergy" ;
         f_diag << endl;
@@ -196,7 +197,7 @@ void OUTPUT::diagOutput(World &world, vector<Species> &species, APSolver &solver
         f_diag << "," << sp.gettotalKE() << ","
                << sp.getPaticleflux() << "," << sp.getEnergyflux() << ","
                << sp.getNumdensity() << "," << sp.getCellflux() << ","
-               << sp.gettotalnumber();
+               << sp.gettotalnumber() << "," << sp.wallDensity << "," << sp.wallTemp;
     }
 
     // 输出电场能项

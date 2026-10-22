@@ -72,6 +72,8 @@ public:
     double wallFlux = 0.;       // 壁面净粒子流 (n_elm*v_Te)，由 ShiftX 更新
     double wallEnergyFlux = 0.; // 壁面净能流 (n_elm*T_elm*v_Te)，由 ShiftX 更新
     double wallFluxCell = 0.;   // 同一时刻 "贴壁网格值 × v" (出射方向), 由 ShiftX 更新
+    double wallDensity = 0.;    // 壁面密度 (n_elm)，由壁面分布 f_wall = 面通量/v 求得
+    double wallTemp = 0.;       // 壁面平行温度 (T_elm)
     dvector Maxwell;        // 垂直速度分布
 
     // topo : Log -> memory

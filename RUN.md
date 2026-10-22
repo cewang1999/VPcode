@@ -29,6 +29,8 @@ tail -f runs/Case4/log.txt
 | 9 | 2.5e-4 | 1000 (dx = 8λ) | 0.004 | 42850 | 粗网格对照 |
 | 10 | 2.5e-4 | 1000 (dx = 8λ) | 0.001 (ω_pe Δt = 4) | 171400 | 推测的文献设置：1000 个 x 点 + Δt = 4/ω_pe |
 | 11 | 2.5e-4 | 1000, Nv = 1024 | 0.001 | 171400 | 同 Case10，速度点数同文献 (1000) |
+| 12 | 1e-3 | 1000, Nv = 1024 | 0.004 | 42850 | 同 Case4，速度点数 ×4：检查电子温度 / 图 7 |
+| 13 | 1e-3 | 1000, Nv = 1024 | 0.001 (ω_pe Δt = 1) | 171400 | 同 Case12，时间步 /4：检查电子数值加热 |
 
 ## case 文件可选参数（缺省值）
 - `lambda`（1e-3）：λ_D / L_par
@@ -42,6 +44,7 @@ tail -f runs/Case4/log.txt
 - `flux.<sp>` / `Enflux.<sp>`：壁面净粒子流 / 能流（n v_Ti，n v_Ti T），两壁平均
 - `flux1.<sp>`：与净通量同一时刻的“贴壁网格值 × v”（出射方向），与 kobra 的 wallinfo 相同
 - `N.<sp>`：域内总粒子数（n L），可检查 N(0) − N(t) = ∫ 2Γ dt 以及 N_i − N_e
-- `den.<sp>`：贴壁网格密度；`totalKE.<sp>`：总动能；最后一列 `ElectricEnergy`
+- `nw.<sp>` / `Tw.<sp>`：壁面密度 / 平行温度（文献图 7），由壁面分布 f_wall = 面通量 / v（出射方向）、入射方向为 0 求得
+- `den.<sp>`：贴壁网格密度（网格中心，含被反射的电子，不是壁面值）；`totalKE.<sp>`：总动能；最后一列 `ElectricEnergy`
 
 画图：`~/plotenv/bin/python plot/FluxComparison.py runs/Case5/runtime_diags.csv runs/Case5`
