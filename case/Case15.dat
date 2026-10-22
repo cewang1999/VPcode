@@ -8,10 +8,10 @@ Nx          8000
 Nv          256
 theta       90
 SolverType  AP
-dt          0.004
-num_ts      42850
+dt          0.0005
+num_ts      171400
 lambda      0.001
 WallFace    PFC3
 VCFL        0
-OutDiag     10
-OutF        4285
+OutDiag     40
+OutF        17140
