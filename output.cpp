@@ -188,6 +188,8 @@ void OUTPUT::diagOutput(World &world, vector<Species> &species, APSolver &solver
                    << ",nw." << sp.name << ",Tw." << sp.name;
         }
         f_diag << ",ElectricEnergy" ;
+        for (Species &sp : species) // 新列加在最后，保持原有列号不变
+            f_diag << ",clipNeg." << sp.name << ",clipSmall." << sp.name;
         f_diag << endl;
     }
 
@@ -203,6 +205,8 @@ void OUTPUT::diagOutput(World &world, vector<Species> &species, APSolver &solver
 
     // 输出电场能项
     f_diag << "," << solver.getElectricEnergy();
+    for (Species &sp : species)
+        f_diag << "," << sp.clipNeg << "," << sp.clipSmall;
 
     f_diag << "\n"; // use \n to avoid flush to disc
     if (world.getTs() % (10 * Const::outDiag) == 0)

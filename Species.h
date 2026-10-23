@@ -74,6 +74,8 @@ public:
     double wallFluxCell = 0.;   // 同一时刻 "贴壁网格值 × v" (出射方向), 由 ShiftX 更新
     double wallDensity = 0.;    // 壁面密度 (n_elm)，由壁面分布 f_wall = 面通量/v 求得
     double wallTemp = 0.;       // 壁面平行温度 (T_elm)
+    double clipNeg = 0.;        // 累计被截断清零的负值质量 (n_elm*L_par)；PFC3 保正，非零说明通量有错
+    double clipSmall = 0.;      // 累计被截断清零的小正值 (f < 1e-10) 质量
     dvector Maxwell;        // 垂直速度分布
 
     // topo : Log -> memory

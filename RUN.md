@@ -61,7 +61,8 @@ tail -f runs/Case4/log.txt
 - `flux1.<sp>`：与净通量同一时刻的“贴壁网格值 × v”（出射方向），与 kobra 的 wallinfo 相同
 - `N.<sp>`：域内总粒子数（n L），可检查 N(0) − N(t) = ∫ 2Γ dt 以及 N_i − N_e
 - `nw.<sp>` / `Tw.<sp>`：壁面密度 / 平行温度（文献图 7），由壁面分布 f_wall = 面通量 / v（出射方向）、入射方向为 0 求得
-- `den.<sp>`：贴壁网格密度（网格中心，含被反射的电子，不是壁面值）；`totalKE.<sp>`：总动能；最后一列 `ElectricEnergy`
+- `den.<sp>`：贴壁网格密度（网格中心，含被反射的电子，不是壁面值）；`totalKE.<sp>`：总动能；`ElectricEnergy` = ΣE²Δx（未乘 λ²/2）
+- `clipNeg.<sp>` / `clipSmall.<sp>`（加在最后，原有列号不变）：累计被 `f < 1e-10 → 0` 截断清零的负值 / 小正值质量（n L）。PFC3 保正，`clipNeg` 应约为 0（~1e-25）；明显非零说明通量出错（如修复前的出发格舍入错误，离子 `clipNeg` 一步跳到 1e-5）
 
 画图：
 - `~/plotenv/bin/python plot/PaperFigs.py runs/Case4 [runs/Case12 ...]`：按文献坐标轴画图 1、图 7 和 Γe/Γi − 1，图存在运行目录（多个目录时存在 runs/）

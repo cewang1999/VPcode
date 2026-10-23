@@ -115,16 +115,24 @@ void ShiftX::computMaxLimiter()
 void ShiftX::updateInteriorCells()
 {
     int _ni = world.ni, _nj = world.nj;
-    double dx = world.getDx();
+    double dx = world.getDx(), dv = world.getDv();
+    double neg = 0., small = 0.;
 
-#pragma omp parallel for schedule(static)
+#pragma omp parallel for schedule(static) reduction(+ : neg, small)
     for (int j = 0; j < _nj; ++j)
         for (int i = 0; i < _ni; ++i)
         {
             double div_x = (flux[i + 1][j] - flux[i][j]) / dx;
-            sp.F(i, j) -= dt * div_x;
-            sp.F(i, j) = (sp.F(i, j) < 1e-10) ? 0. : sp.F(i, j); //      fmax(sp.F(i, j), 0);
+            double val = sp.F(i, j) - dt * div_x;
+            if (val < 1e-10)
+            {
+                (val < 0. ? neg : small) += fabs(val) * dx * dv; // 记录截断量
+                val = 0.;
+            }
+            sp.F(i, j) = val;
         }
+    sp.clipNeg += neg;
+    sp.clipSmall += small;
 }
 
 void ShiftX::computeWallFlux()
@@ -295,10 +303,10 @@ void ShiftV::fillGhostRow(int i)
     }
 }
 
-void ShiftV::advectRow(int i, double dtl)
+void ShiftV::advectRow(int i, double dtl, double &neg, double &small)
 {
     int _nj = world.nj;
-    double dv = world.getDv();
+    double dv = world.getDv(), dx = world.getDx();
 
     if (flux_calc->isHighOrder())
     {
@@ -313,8 +321,13 @@ void ShiftV::advectRow(int i, double dtl)
     for (int j = 0; j < _nj; ++j)
     {
         double div_v = (flux[i][j + 1] - flux[i][j]) / dv;
-        sp.F(i, j) -= dtl * div_v;
-        sp.F(i, j) = (sp.F(i, j) < 1e-10) ? 0. : sp.F(i, j);
+        double val = sp.F(i, j) - dtl * div_v;
+        if (val < 1e-10)
+        {
+            (val < 0. ? neg : small) += fabs(val) * dx * dv; // 记录截断量
+            val = 0.;
+        }
+        sp.F(i, j) = val;
     }
     fillGhostRow(i);
 }
@@ -323,7 +336,8 @@ void ShiftV::advection()
 {
     // 各行互相独立；VCFL > 0 时按本行加速度子循环，使每个子步 |a| dt_sub < VCFL * dv（同 kobra 的时间步限制）
     double dv = world.getDv();
-#pragma omp parallel for schedule(dynamic, 4)
+    double neg = 0., small = 0.;
+#pragma omp parallel for schedule(dynamic, 4) reduction(+ : neg, small)
     for (int i = 0; i < world.ni; ++i)
     {
         int nsub = 1;
@@ -333,6 +347,8 @@ void ShiftV::advection()
             nsub = std::max(1, (int)std::ceil(a * dt / (Const::vcfl * dv)));
         }
         for (int k = 0; k < nsub; ++k)
-            advectRow(i, dt / nsub);
+            advectRow(i, dt / nsub, neg, small);
     }
+    sp.clipNeg += neg;
+    sp.clipSmall += small;
 }
