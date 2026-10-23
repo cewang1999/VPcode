@@ -30,7 +30,7 @@ void ShiftX::computeFlux(int i, int j)
             double xRi = x[Ci] + 0.5 * world.getDx();
             double X = xRi - dt * velocity;
             X = std::min(std::max(X, world.getXmin() - world.getDx()), world.getXmax() + world.getDx()); // 出口外 f=0
-            int Cj = findCell(X);
+            int Cj = std::min(findCell(X), i - 1); // 出发点不能越过上风格 (位移极小时 floor 的舍入会落到下风格)
             int jrx = cell_Join(Cj, 1);
             join[0] = jrx, join[1] = j;
             collectStencil(velocity, join, stencil);
@@ -44,7 +44,7 @@ void ShiftX::computeFlux(int i, int j)
             double xRi = x[Ci] + 0.5 * world.getDx();
             double X = xRi - dt * velocity;
             X = std::min(std::max(X, world.getXmin() - world.getDx()), world.getXmax() + world.getDx()); // 出口外 f=0
-            int Cj = findCell(X);
+            int Cj = std::max(findCell(X), i); // 同上，负速度时出发点不能落到面左侧
             int jlx = cell_Join(Cj, 0);
             join[0] = jlx, join[1] = j;
             collectStencil(velocity, join, stencil);
@@ -205,7 +205,7 @@ void ShiftV::computeFlux(int i, int j, double dtl)
             double xRi = v[Ci] + 0.5 * world.getDv();
             double X = xRi - dtl * velocity;
             X = std::min(std::max(X, world.getVmin() - world.getDv()), world.getVmax() + world.getDv());
-            int Cj = findCell(X);
+            int Cj = std::min(findCell(X), j - 1); // 出发点不能越过上风格 (加速度极小时 floor 的舍入会落到下风格)
             int jrx = cell_Join(Cj, 1);
             join[0] = i, join[1] = jrx;
             collectStencil(velocity, join, stencil);
@@ -219,7 +219,7 @@ void ShiftV::computeFlux(int i, int j, double dtl)
             double xRi = v[Ci] + 0.5 * world.getDv();
             double X = xRi - dtl * velocity;
             X = std::min(std::max(X, world.getVmin() - world.getDv()), world.getVmax() + world.getDv());
-            int Cj = findCell(X);
+            int Cj = std::max(findCell(X), j); // 同上，负加速度时出发点不能落到面左侧
             int jlx = cell_Join(Cj, 0);
             join[0] = i, join[1] = jlx;
             collectStencil(velocity, join, stencil);
