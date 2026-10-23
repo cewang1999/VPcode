@@ -126,8 +126,9 @@ def fig7(runs, out_dir):
         ins.plot(t, d["Tw.H+"] * t**2, "k-", lw=1.0)
         ins.plot(tf, tif * tf**2, "k:", lw=0.8)
         ins.set_xlim(0, 4)
-        ins.set_ylim(0, 0.003)
-        ins.set_yticks([0, 0.001, 0.002, 0.003])
+        late = t > 0.5
+        ytop = 1.2 * max(np.max(d["Tw.H+"][late] * t[late] ** 2), np.max((tif * tf**2)[tf > 0.5]))
+        ins.set_ylim(0, ytop)
         ins.tick_params(labelsize=7, direction="in")
         ins.set_xlabel("time", fontsize=7)
         for ax in (a1, a2):
