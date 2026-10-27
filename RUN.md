@@ -67,3 +67,13 @@ tail -f runs/Case4/log.txt
 画图：
 - `~/plotenv/bin/python plot/PaperFigs.py runs/Case4 [runs/Case12 ...]`：按文献坐标轴画图 1、图 7 和 Γe/Γi − 1，图存在运行目录（多个目录时存在 runs/）
 - `~/plotenv/bin/python plot/FluxComparison.py runs/Case5/runtime_diags.csv runs/Case5`
+
+## 与 kobra 对比
+quasi-kobra-sup 的 `naga/usr.c` 末尾加了 `diag_mon()`（`DIAG BEGIN` 到 `DIAG END`，另在 `usrmon()` 里有一行标 `DIAG` 的调用），
+每步输出 `$kobra_data/diag_budget.dat`（N、平行动能、W、高斯定律 Q 与 E_R−E_L、壁面贴壁格出射 n/j/T、floor 量、Poisson 残差），
+电场能突跳时写 `diag_spike_p<rank>.dat`。kobra 跑完后：
+```bash
+tools/fetch_kobra.sh <标签> [kobra数据目录] [kobra算例.dat]   # 拷到 runs/kobra_<标签>/
+~/plotenv/bin/python plot/KobraDiag.py runs/kobra_<标签> runs/Case25   # 对比图 KobraDiag.png + 终端汇总
+```
+kobra 的净通量由 Γ = −dN/dt / 2 得到（内部守恒，两壁平均）；kobra 为单精度，离子到达壁面前的离子"净通量"是舍入噪声。
