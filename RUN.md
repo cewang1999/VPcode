@@ -50,6 +50,11 @@ tail -f runs/Case4/log.txt
 | 30 | 1e-3 | 1000, Nv = 256 | 自适应 | 0–1 τi | 与 kobra 1000×256 完全相同的离散：`Scheme kobra` + `WallE kobra` + `Umax 6` |
 | 31 | 1e-3 | 512, Nv = 256 | 自适应 | 0–0.6 τi | 同 Case30，对应 kobra 512×256 |
 | 32 | 1e-3 | 256, Nv = 128 | 自适应 | 0–0.75 τi | 同 Case30，对应 kobra 256×128（本机约 1 分钟） |
+| 33 | 1e-3 | 1000, Nv = 256 | 自适应 | 0–1 τi | 同 Case30，`WallE central`：只换壁面离散 |
+| 34 | 1e-3 | 1000, Nv = 256 | 自适应 | 0–1 τi | 同 Case30，`Flux PFC3`：只换输运格式（本机约 3 h，建议工作站） |
+| 35 | 1e-3 | 1000, Nv = 256 | 自适应 | 0–1 τi | 同 Case30，`Flux PFC3` + `WallE central`：与 Case27 只差时间推进（建议工作站） |
+| 36–38 | 1e-3 | 512, Nv = 256 | 自适应 | 0–0.6 τi | 同 Case33–35，对应 Case31（本机约 40 min） |
+| 39 | 1e-3 | 512, Nv = 256 | 自适应 | 0–0.6 τi | 同 Case37（PFC3 + WallE kobra），`WallFace upwind1`：贴壁格偏高 +34% → +6.5%，与 kobra 相同，原因在壁面出射面值 |
 
 ## case 文件可选参数（缺省值）
 - `lambda`（1e-3）：λ_D / L_par
@@ -65,6 +70,8 @@ tail -f runs/Case4/log.txt
   每步 dt = `CFL` / max(|v|/dx, |qE/m|/dv)（只统计 f 高于下限的格，同 `usrtimestep`），由 fⁿ 解 φ 后做 Strang 分裂 x(dt/2) → v(dt) → x(dt/2)；
   f 不截断而是抬到下限 `Dfloor`·m·λ²（同 `usrfxp`）。算到 t_end = `dt` × `num_ts`（case 中的 dt 只用来定 t_end）。
   此时 `clipNeg/clipSmall` 记录的是被抬到下限所加的质量，`flux1/nw/Tw` 取每步结束时贴壁格出射部分（同 kobra 的诊断）
+- `Flux`（MUSCL）：`Scheme kobra` 下的输运格式。`MUSCL` 同 kobra；`PFC3` 为 VPcode 原格式（壁面出射面值见 `WallFace`），
+  时间推进仍同 kobra，用来把输运格式、壁面离散、时间推进三者的影响分开
 - `Dfloor`（1e-10）、`CFL`（0.9）：见 `Scheme kobra`
 - `Umax`（0）：速度网格 ±Umax 个热速度（电子 v_Te，离子 v_Ti），对应 kobra 的 `U … -Umax Umax`；0 为原网格（电子 ±6，离子 ±0.15 v_Te = ±6.43 v_Ti）
 

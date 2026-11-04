@@ -79,7 +79,7 @@ int main(int argc, char *argv[])
              << " Scheme=" << Const::scheme << " v: e ±" << ve << ", i ±" << vi
              << " | electron x-CFL(v_max)=" << cflx << endl;
         if (kobra)
-            cout << "Scheme kobra: dt = " << Const::cfl << " / max(|v|/dx, |qE/m|/dv), f floor e " << e.fFloor
+            cout << "Scheme kobra (Flux " << Const::flux << "): dt = " << Const::cfl << " / max(|v|/dx, |qE/m|/dv), f floor e " << e.fFloor
                  << ", i " << D.fFloor << ", t_end = " << world.getDt() * world.getNumTs() << endl;
         if (Const::wallFace == "upwind1" && cflx > 1.)
             cerr << "WARNING: WallFace upwind1 requires x-CFL < 1" << endl;
@@ -94,6 +94,7 @@ int main(int argc, char *argv[])
     {
         // 同 kobra 的 integrate：dt 由 f^n 与上一步电场定出；由 f^n 解 φ (AP 系数用整步 dt)，
         // 再 x 半步 → v 整步 (E = -∇φ) → x 半步 (Strang)。算到 t_end = dt(case) × num_ts
+        const bool pfcFlux = (Const::flux == "PFC3"); // 只换输运格式, 时间推进仍同 kobra
         double tEnd = world.getDt() * world.getNumTs();
         world.setTime(0., std::numeric_limits<int>::max()); // 时间 = 已完成各步 dt 之和
         while (world.advanceNextStep() && world.getPhysicalTime() < tEnd)
@@ -122,12 +123,18 @@ int main(int argc, char *argv[])
             solver.solve();
             spike.check(world.getTs());
 
-            for (ShiftX *s : {&eShiftx, &iShiftx})
-                s->setDt(0.5 * dt), s->advectionKobra();
-            for (ShiftV *s : {&eShiftv, &iShiftv})
-                s->setDt(dt), s->advectionKobra();
-            for (ShiftX *s : {&eShiftx, &iShiftx})
-                s->advectionKobra();
+            for (int half = 0; half < 2; ++half)
+            {
+                for (ShiftX *s : {&eShiftx, &iShiftx})
+                {
+                    s->setDt(0.5 * dt);
+                    pfcFlux ? s->advection() : s->advectionKobra();
+                    s->stepDiagKobra();
+                }
+                if (half == 0)
+                    for (ShiftV *s : {&eShiftv, &iShiftv})
+                        s->setDt(dt), pfcFlux ? s->advection() : s->advectionKobra();
+            }
 
             if (Const::outF > 0 && world.getTs() % Const::outF == 0)
                 OUTPUT::output(e.f, world, world.getTs());

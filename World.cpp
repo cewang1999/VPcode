@@ -36,6 +36,7 @@ namespace Const
 	int outF = 100;
 	string wallE = "central";
 	string scheme = "PFC3";
+	string flux = "MUSCL";
 	double dfloor = 1e-10;
 	double cfl = 0.9;
 	double umax = 0.;
@@ -96,6 +97,8 @@ void Const::readConst(string no)
 			record >> Const::wallE;
 		else if (param == "Scheme")
 			record >> Const::scheme;
+		else if (param == "Flux")
+			record >> Const::flux;
 		else if (param == "Dfloor")
 			record >> Const::dfloor;
 		else if (param == "CFL")

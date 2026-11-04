@@ -48,9 +48,6 @@ void ShiftX::advectionKobra()
             flux[i][j] = F[i];
     }
     computeWallFlux();
-    sp.fluxAcc += sp.wallFlux * dt;
-    sp.energyAcc += sp.wallEnergyFlux * dt;
-    sp.timeAcc += dt;
 #pragma omp parallel for schedule(static) reduction(+ : neg, small)
     for (int j = 0; j < _nj; ++j)
         for (int i = 0; i < _ni; ++i)
@@ -66,9 +63,17 @@ void ShiftX::advectionKobra()
     sp.clipNeg += neg;
     sp.clipSmall += small;
     fillGhostCells();
+}
 
-    // 贴壁格出射值 × v 与壁面 n、T 改用推进后的 f：Strang 第二个 x 半步之后即一步结束，同 kobra 在每步结束后采样
-    // (此格式的壁面出射面值就是贴壁格值，壁面分布 = 贴壁格出射部分)
+void ShiftX::stepDiagKobra()
+{
+    // Scheme kobra 每个 x 子步之后调用 (Flux MUSCL 或 PFC3 均可)：累计壁面面通量 (输出时取时间平均)；
+    // 贴壁格出射值 × v 与壁面 n、T 取推进后的 f (Strang 第二个 x 半步之后即一步结束，同 kobra 在每步结束后采样)
+    int _ni = world.ni, _nj = world.nj;
+    double dv = world.getDv();
+    sp.fluxAcc += sp.wallFlux * dt;
+    sp.energyAcc += sp.wallEnergyFlux * dt;
+    sp.timeAcc += dt;
     double cell = 0., n2 = 0., t2 = 0.;
     for (int side = 0; side < 2; ++side)
     {

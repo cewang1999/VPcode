@@ -44,7 +44,8 @@ public:
     void computeFlux(int i, int j);                        // 计算 (i,j) 处 Flux
     void updateInteriorCells();                            // 填充 X 方向所有网格
     void advection();
-    void advectionKobra();             // Scheme kobra: MUSCL-Hancock (van Albada 斜率) + kobra 吸收壁, 推进 dt
+    void advectionKobra();             // Flux MUSCL: MUSCL-Hancock (van Albada 斜率) + kobra 吸收壁, 推进 dt
+    void stepDiagKobra();              // Scheme kobra: x 子步后的壁面诊断 (通量时间积分, 贴壁格出射部分)
     void setDt(double _dt) { dt = _dt; } // Scheme kobra: 自适应 dt / Strang 半步
 
 private:
