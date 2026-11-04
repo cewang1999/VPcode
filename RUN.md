@@ -55,6 +55,9 @@ tail -f runs/Case4/log.txt
 | 35 | 1e-3 | 1000, Nv = 256 | 自适应 | 0–1 τi | 同 Case30，`Flux PFC3` + `WallE central`：与 Case27 只差时间推进（建议工作站） |
 | 36–38 | 1e-3 | 512, Nv = 256 | 自适应 | 0–0.6 τi | 同 Case33–35，对应 Case31（本机约 40 min） |
 | 39 | 1e-3 | 512, Nv = 256 | 自适应 | 0–0.6 τi | 同 Case37（PFC3 + WallE kobra），`WallFace upwind1`：贴壁格偏高 +34% → +6.5%，与 kobra 相同，原因在壁面出射面值 |
+| 40 | 1e-3 | 512, Nv = 256 | 自适应 | 0–0.6 τi | 同 Case36（MUSCL），`WallE onesided` |
+| 41 | 1e-3 | 1000, Nv = 256 | 自适应 | 0–1 τi | 同 Case33（MUSCL），`WallE onesided` |
+| 42 | 1e-3 | 512, Nv = 256 | 自适应 | 0–0.6 τi | 同 Case38（PFC3），`WallE onesided`：onesided 下后期升温消失，与输运格式无关 |
 
 ## case 文件可选参数（缺省值）
 - `lambda`（1e-3）：λ_D / L_par
