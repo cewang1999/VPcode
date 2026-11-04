@@ -1,6 +1,136 @@
 #include "shift.h"
 #include <cmath>
 
+namespace
+{
+    // kobra 的斜率平均 av (funcs.h, van Albada)；tiny = 1e-30 换成 VPcode 单位 (f_kobra = f / (λ² √m))
+    inline double kobraAv(double a, double b, double tiny)
+    {
+        return (b * a < tiny) ? 0. : a * b * (a + b) / (a * a + b * b);
+    }
+    inline double kobraTiny(const Species &sp) { return 1e-30 * pow(Const::lamda, 4) * sp.mass; }
+
+    // kobra 的 step(): 由旧值 q[1..n] 与幽灵 q[0], q[n+1] 求斜率 diff = av(右差, 左差)，
+    // 内部面取迎风面值 + Hancock 修正 (semi)：f = a (q_L + diff_L (1 - c)/2) 或 a (q_R - diff_R (1 + c)/2)，c = a dt / Δ；
+    // 两端面不做 Hancock 修正，面值由 usrbd 给出 (lo/hi 为两端面通量，由调用者填)
+    void kobraFaces(const std::vector<double> &q, double a, double c, double tiny,
+                    std::vector<double> &diff, std::vector<double> &F)
+    {
+        int n = (int)q.size() - 2;
+        for (int k = 0; k < n; ++k)
+            diff[k] = kobraAv(q[k + 2] - q[k + 1], q[k + 1] - q[k], tiny);
+        for (int k = 1; k < n; ++k)
+            F[k] = (a >= 0) ? a * (q[k] + 0.5 * diff[k - 1] * (1. - c))
+                            : a * (q[k + 1] - 0.5 * diff[k] * (1. + c));
+    }
+}
+
+void ShiftX::advectionKobra()
+{
+    // 吸收壁 (kobra usrbd)：出射方向幽灵 = 贴壁格 (斜率为 0，面值 = 贴壁格值)；入射方向幽灵 = 2 fFloor - 贴壁格 (面值 = fFloor)
+    int _ni = world.ni, _nj = world.nj;
+    double dx = world.getDx(), dv = world.getDv();
+    double fl = sp.fFloor, tiny = kobraTiny(sp);
+    double neg = 0., small = 0.;
+#pragma omp parallel for schedule(static)
+    for (int j = 0; j < _nj; ++j)
+    {
+        double v = world.V(j);
+        std::vector<double> q(_ni + 2), diff(_ni), F(_ni + 1);
+        for (int i = 0; i < _ni; ++i)
+            q[i + 1] = sp.F(i, j);
+        q[0] = (v < 0) ? q[1] : 2. * fl - q[1];
+        q[_ni + 1] = (v > 0) ? q[_ni] : 2. * fl - q[_ni];
+        kobraFaces(q, v, v * dt / dx, tiny, diff, F);
+        F[0] = v * ((v < 0) ? q[1] - 0.5 * diff[0] : fl);
+        F[_ni] = v * ((v > 0) ? q[_ni] + 0.5 * diff[_ni - 1] : fl);
+        for (int i = 0; i <= _ni; ++i)
+            flux[i][j] = F[i];
+    }
+    computeWallFlux();
+    sp.fluxAcc += sp.wallFlux * dt;
+    sp.energyAcc += sp.wallEnergyFlux * dt;
+    sp.timeAcc += dt;
+#pragma omp parallel for schedule(static) reduction(+ : neg, small)
+    for (int j = 0; j < _nj; ++j)
+        for (int i = 0; i < _ni; ++i)
+        {
+            double val = sp.F(i, j) - dt * (flux[i + 1][j] - flux[i][j]) / dx;
+            if (val < fl)
+            {
+                (val < 0. ? neg : small) += (fl - val) * dx * dv; // 记录被抬到下限所加的质量
+                val = fl;
+            }
+            sp.F(i, j) = val;
+        }
+    sp.clipNeg += neg;
+    sp.clipSmall += small;
+    fillGhostCells();
+
+    // 贴壁格出射值 × v 与壁面 n、T 改用推进后的 f：Strang 第二个 x 半步之后即一步结束，同 kobra 在每步结束后采样
+    // (此格式的壁面出射面值就是贴壁格值，壁面分布 = 贴壁格出射部分)
+    double cell = 0., n2 = 0., t2 = 0.;
+    for (int side = 0; side < 2; ++side)
+    {
+        double n = 0., g = 0., p = 0.;
+        for (int j = 0; j < _nj; ++j)
+        {
+            double v = world.V(j);
+            if ((side == 0 && v < 0) || (side == 1 && v > 0))
+            {
+                double f = sp.F(side == 0 ? 0 : _ni - 1, j);
+                n += f * dv;
+                g += f * fabs(v) * dv;
+                p += f * v * v * dv;
+            }
+        }
+        cell += 0.5 * g;
+        n2 += 0.5 * n;
+        if (n > 0)
+            t2 += 0.5 * sp.mass * (p / n - (g / n) * (g / n));
+    }
+    sp.wallFluxCell = cell;
+    sp.wallDensity = n2;
+    sp.wallTemp = t2;
+}
+
+void ShiftV::advectionKobra()
+{
+    // FREE 边界 (kobra usrbd 缺省 pl = pr)：幽灵 = 边缘格，两端面值 = 边缘格的重构值 (可流入)
+    int _ni = world.ni, _nj = world.nj;
+    double dx = world.getDx(), dv = world.getDv();
+    double fl = sp.fFloor, tiny = kobraTiny(sp);
+    double neg = 0., small = 0.;
+#pragma omp parallel for schedule(static) reduction(+ : neg, small)
+    for (int i = 0; i < _ni; ++i)
+    {
+        double a = sp.charge * getElectricField(i) / sp.mass;
+        std::vector<double> q(_nj + 2), diff(_nj), F(_nj + 1);
+        for (int j = 0; j < _nj; ++j)
+            q[j + 1] = sp.F(i, j);
+        q[0] = q[1];
+        q[_nj + 1] = q[_nj];
+        kobraFaces(q, a, a * dt / dv, tiny, diff, F);
+        F[0] = a * (q[1] - 0.5 * diff[0]);
+        F[_nj] = a * (q[_nj] + 0.5 * diff[_nj - 1]);
+        for (int j = 0; j < _nj; ++j)
+        {
+            double val = q[j + 1] - dt * (F[j + 1] - F[j]) / dv;
+            if (val < fl)
+            {
+                (val < 0. ? neg : small) += (fl - val) * dx * dv;
+                val = fl;
+            }
+            sp.F(i, j) = val;
+        }
+        // 速度幽灵格置零：AP 方程的矩只含真实网格 (同 kobra)
+        for (int layer = 1; layer <= world.nghosts; layer++)
+            sp.F(i, -layer) = sp.F(i, _nj + layer - 1) = 0.;
+    }
+    sp.clipNeg += neg;
+    sp.clipSmall += small;
+}
+
 void ShiftX::computeFlux()
 {
 #pragma omp parallel for schedule(static)

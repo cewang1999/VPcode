@@ -193,7 +193,9 @@ void OUTPUT::diagOutput(World &world, vector<Species> &species, APSolver &solver
         f_diag << endl;
     }
 
-    f_diag << world.getTs() * world.getDt() / sqrt(Const::m_H); // 时间单位：离子渡越时间 tau_i
+    // 时间单位：离子渡越时间 tau_i；Scheme kobra 的 dt 每步不同，用累计时间
+    double t = (Const::scheme == "kobra") ? world.getPhysicalTime() : world.getTs() * world.getDt();
+    f_diag << t / sqrt(Const::m_H);
 
     for (Species &sp : species)
     {

@@ -68,14 +68,16 @@ def from_vpcode(run_dir):
     t = d["ts"]
     v = {"ts": t, "W": 0.5 * lam**2 * d["ElectricEnergy"]}
     for sp in ("e-", "H+"):
+        # 累计流出与 kobra 一样由粒子数求 (N(0) - N) / 2；瞬时净通量用 flux 列
+        # (csv 中 N 只有 6 位有效数字，求导噪声大；Scheme kobra 的 flux 列已是两次输出间的时间平均)
+        N = d["N." + sp]
         v["flux." + sp] = d["flux." + sp]
+        v["out." + sp] = (N[0] - N) / 2
         v["flux1." + sp] = d["flux1." + sp]
-        v["N." + sp] = d["N." + sp]
+        v["N." + sp] = N
         v["K." + sp] = d["totalKE." + sp]
         v["nw." + sp] = d["nw." + sp]
         v["Tw." + sp] = d["Tw." + sp]
-        g = d["flux." + sp]
-        v["out." + sp] = np.concatenate([[0], np.cumsum(0.5 * (g[1:] + g[:-1]) * np.diff(t))])
     return v
 
 
@@ -108,43 +110,66 @@ def summary(name, r, kobra):
         print(line)
 
 
+def smooth(t, y, w=0.01):
+    """时间窗 w (τi) 的滑动平均, 用来看清 kobra 中振荡的净通量"""
+    n = max(1, int(round(w / max(np.median(np.diff(t)), 1e-30))))
+    if n < 3:
+        return y
+    ker = np.ones(n) / n
+    pad = np.concatenate([np.full(n // 2, y[0]), y, np.full(n - 1 - n // 2, y[-1])])
+    return np.convolve(pad, ker, mode="valid")
+
+
 def plot(kdir, k, vps):
-    fig, ax = plt.subplots(2, 3, figsize=(15, 8))
+    fig, ax = plt.subplots(2, 4, figsize=(19, 8))
     ax = ax.ravel()
     runs = [("kobra", k, "k")] + [(os.path.basename(os.path.normpath(p)), v, c)
                                   for (p, v), c in zip(vps, ["tab:red", "tab:blue", "tab:green"])]
+    tmax = min(4, 1.05 * k["ts"][-1])  # 只画 kobra 有数据的时间段
     for name, r, col in runs:
         t = r["ts"]
         ax[0].plot(t, r["flux.H+"], "-", color=col, lw=1.2, label=f"{name} ion net")
         ax[0].plot(t, r["flux.e-"], "--", color=col, lw=1.2, label=f"{name} e net")
         ax[0].plot(t, r["flux1.e-"], ":", color=col, lw=1.0, label=f"{name} e cell")
         ok = r["flux.H+"] > 0.05 * r["flux.H+"].max()
-        ax[1].plot(t[ok], 100 * (r["flux.e-"][ok] / r["flux.H+"][ok] - 1), "-", color=col, lw=1.0,
+        # 净通量与贴壁格分两幅画; 细线为原始值, 粗线为 0.01 τi 滑动平均
+        for a, key in ((ax[1], "flux"), (ax[2], "flux1")):
+            y = 100 * (r[key + ".e-"][ok] / r[key + ".H+"][ok] - 1)
+            a.plot(t[ok], y, "-", color=col, lw=0.4, alpha=0.35)
+            a.plot(t[ok], smooth(t[ok], y), "-", color=col, lw=1.4, label=name)
+        cell_e, cell_i = cum(r["flux1.e-"], t), cum(r["flux1.H+"], t)
+        ok = r["out.H+"] > 0.02 * r["out.H+"].max()
+        ax[3].plot(t[ok], 100 * (r["out.e-"][ok] / r["out.H+"][ok] - 1), "-", color=col, lw=1.2,
                    label=f"{name} net")
-        ax[1].plot(t[ok], 100 * (r["flux1.e-"][ok] / r["flux1.H+"][ok] - 1), ":", color=col, lw=1.0,
-                   label=f"{name} cell")
+        ax[3].plot(t[ok], 100 * (cell_e[ok] / cell_i[ok] - 1), ":", color=col, lw=1.4, label=f"{name} cell")
         pos = t > 0
-        ax[2].semilogx(t[pos], (r["W"] / e0(r) * 1000)[pos], "-", color=col, lw=1.2, label=name)
-        ax[4].semilogy(t, np.maximum(r["Tw.e-"], 1e-6), "-", color=col, lw=1.2, label=f"{name} wall")
-        ax[4].semilogy(t, 2 * r["K.e-"] / r["N.e-"], "--", color=col, lw=1.0, label=f"{name} global")
-        late = t > 0.2
-        ax[5].plot(t[late], (r["Tw.H+"] * t**2)[late], "-", color=col, lw=1.2, label=name)
+        ax[4].semilogx(t[pos], (r["W"] / e0(r) * 1000)[pos], "-", color=col, lw=1.2, label=name)
+        ax[6].semilogy(t, np.maximum(r["Tw.e-"], 1e-6), "-", color=col, lw=1.2, label=f"{name} wall")
+        ax[6].semilogy(t, 2 * r["K.e-"] / r["N.e-"], "--", color=col, lw=1.0, label=f"{name} global")
+        late = (t > 0.2) & (t <= tmax)
+        ax[7].plot(t[late], (r["Tw.H+"] * t**2)[late], "-", color=col, lw=1.2, label=name)
     t = k["ts"]
-    ax[3].plot(t, 100 * (k["Q"] - k["dE"]) / max(abs(k["Q"]).max(), 1e-30), "k-", lw=1.0,
+    ax[5].plot(t, 100 * (k["Q"] - k["dE"]) / max(abs(k["Q"]).max(), 1e-30), "k-", lw=1.0,
                label=r"$(Q-\lambda^2(E_R-E_L))/\max|Q|$")
-    ax[3].plot(t, 100 * k["gmax"], "k:", lw=1.0, label=r"max$|g|$/max$|\rho|$")
-    ax[5].axhline(PF.SIGMA**2 / 2, color="0.5", lw=0.8)
-    titles = [r"$\Gamma$ ($n v_{Ti}$)", r"$\Gamma_e/\Gamma_i-1$ (%)", r"$W/E_0\times1000$",
-              "kobra: Gauss / Poisson residual (%)", r"$T_e$ ($T_{ELM}$)", r"$T_i t^2$ (wall)"]
+    ax[5].plot(t, 100 * k["gmax"], "k:", lw=1.0, label=r"max$|g|$/max$|\rho|$")
+    ax[7].axhline(PF.SIGMA**2 / 2, color="0.5", lw=0.8)
+    titles = [r"$\Gamma$ ($n v_{Ti}$)", r"$\Gamma_e/\Gamma_i-1$ (%), net $-dN/dt$",
+              r"$\Gamma_e/\Gamma_i-1$ (%), wall cell", r"cumulative $\Gamma_e/\Gamma_i-1$ (%)",
+              r"$W/E_0\times1000$", "kobra: Gauss / Poisson residual (%)", r"$T_e$ ($T_{ELM}$)",
+              r"$T_i t^2$ (wall)"]
     for a, ti in zip(ax, titles):
         a.set_title(ti, fontsize=11)
         PF.paper_axes(a)
         a.legend(frameon=False, fontsize=7)
-    ax[0].set_xlim(0, 4)
-    ax[1].set_xlim(0, 4)
-    ax[1].set_ylim(-5, 30)
-    ax[2].set_xlim(1e-3, 4)
-    fig.text(0.5, 0.005, "wall n, T: kobra from the outgoing part of the wall cell; VPcode from the wall face flux",
+    for a in (ax[0], ax[1], ax[2], ax[3], ax[6], ax[7]):
+        a.set_xlim(0, tmax)
+    ax[1].set_ylim(-3, 3)
+    ax[2].set_ylim(-5, 30)
+    ax[3].set_ylim(-5, 30)
+    ax[4].set_xlim(1e-3, tmax)
+    ax[5].set_xlim(0, tmax)
+    fig.text(0.5, 0.005, "wall n, T: kobra and VPcode Scheme kobra from the outgoing part of the wall cell; "
+             "VPcode PFC3 from the wall face flux",
              ha="center", fontsize=9)
     fig.tight_layout(rect=(0, 0.02, 1, 1))
     out = os.path.join(kdir, "KobraDiag.png")

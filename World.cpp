@@ -35,6 +35,10 @@ namespace Const
 	int outDiag = 10;
 	int outF = 100;
 	string wallE = "central";
+	string scheme = "PFC3";
+	double dfloor = 1e-10;
+	double cfl = 0.9;
+	double umax = 0.;
 	int eFilter = 0;
 	double spikeDump = 0.;
 }
@@ -90,6 +94,14 @@ void Const::readConst(string no)
 			record >> Const::outF;
 		else if (param == "WallE")
 			record >> Const::wallE;
+		else if (param == "Scheme")
+			record >> Const::scheme;
+		else if (param == "Dfloor")
+			record >> Const::dfloor;
+		else if (param == "CFL")
+			record >> Const::cfl;
+		else if (param == "Umax")
+			record >> Const::umax;
 		else if (param == "EFilter")
 			record >> Const::eFilter;
 		else if (param == "SpikeDump")

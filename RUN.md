@@ -44,6 +44,12 @@ tail -f runs/Case4/log.txt
 | 24 | 1e-3 | 1000, Nv = 256 | 0.001 | 171400 | 同 Case23，Nv = 256（快约 4 倍）：看突发事件是否与速度分辨率有关 |
 | 25 | 1e-3 | 1000, Nv = 1000 | 0.004 | 42850 | 文献分辨率（x、v 各 1000 点，Δt = 4/ω_pe），`WallE onesided` + `SpikeDump 5` |
 | 26 | 1e-3 | 1000, Nv = 1000 | 0.004 | 42850 | 同 Case25，`WallE central`（原壁面离散）：修复舍入错误后在文献分辨率下最终确认 |
+| 27 | 1e-3 | 1000, Nv = 256 | 0.001 | 42850 | 与 kobra 1000×256 同分辨率（ω_pe Δt = 1，与 kobra 自适应步长相近），`WallE central`，0–1 τi |
+| 28 | 1e-3 | 512, Nv = 256 | 0.001 | 25710 | 与 kobra 512×256 同分辨率，`WallE central`，0–0.6 τi |
+| 29 | 1e-3 | 256, Nv = 128 | 0.0005 | 64275 | 与 kobra 256×128 同分辨率，`WallE central`，0–0.75 τi |
+| 30 | 1e-3 | 1000, Nv = 256 | 自适应 | 0–1 τi | 与 kobra 1000×256 完全相同的离散：`Scheme kobra` + `WallE kobra` + `Umax 6` |
+| 31 | 1e-3 | 512, Nv = 256 | 自适应 | 0–0.6 τi | 同 Case30，对应 kobra 512×256 |
+| 32 | 1e-3 | 256, Nv = 128 | 自适应 | 0–0.75 τi | 同 Case30，对应 kobra 256×128（本机约 1 分钟） |
 
 ## case 文件可选参数（缺省值）
 - `lambda`（1e-3）：λ_D / L_par
@@ -54,6 +60,13 @@ tail -f runs/Case4/log.txt
 - `EFilter`（0）：内部电场 (1,2,1)/4 二项式滤波次数，贴壁 2 格不滤
 - `SpikeDump`（0）：电场能突跳诊断。某步电场能超过上一步的 `SpikeDump` 倍时，在 `spike/ev<k>_` 下保存触发步的 fⁿ 与前一步 f^{n-1}（`fe_now/fe_prev/fi_now/fi_prev.txt`，格式同 `results/vlasov_*.txt`），以及触发前后各 20 步的场剖面 `prof.csv`（φ, E, ρ, J, R, Σf/m，含 i = −1 与 Nx 两个幽灵点）；最多 5 次
 - `WallE`（central）：贴壁格电场离散。`central`：原方案，E₀ = −(φ₁ − φ_g)/2dx，φ_g = −φ₀；`onesided`：E₀ = −(φ₁ − φ₀)/dx，且 AP 方程壁面面系数只保留 λ²（满足离散高斯定律，后期电子数值加热大幅减小）；`kobra`：与 quasi-kobra 的 mug_kobra.c 相同（幽灵 φ_g = −2.5φ₀ + 0.5φ₁，壁面电流取壁面面通量，壁面 ∂R 单侧估计）
+- `Scheme`（PFC3）：输运与时间推进。`kobra`：与 quasi-kobra 相同——x、v 方向均为 MUSCL-Hancock（kobra 的 van Albada 斜率 `av`，即 `semi`），
+  x 吸收壁按 kobra 的 `usrbd`（出射面值 = 贴壁格值，入射面值 = 下限），v 方向 FREE 边界；
+  每步 dt = `CFL` / max(|v|/dx, |qE/m|/dv)（只统计 f 高于下限的格，同 `usrtimestep`），由 fⁿ 解 φ 后做 Strang 分裂 x(dt/2) → v(dt) → x(dt/2)；
+  f 不截断而是抬到下限 `Dfloor`·m·λ²（同 `usrfxp`）。算到 t_end = `dt` × `num_ts`（case 中的 dt 只用来定 t_end）。
+  此时 `clipNeg/clipSmall` 记录的是被抬到下限所加的质量，`flux1/nw/Tw` 取每步结束时贴壁格出射部分（同 kobra 的诊断）
+- `Dfloor`（1e-10）、`CFL`（0.9）：见 `Scheme kobra`
+- `Umax`（0）：速度网格 ±Umax 个热速度（电子 v_Te，离子 v_Ti），对应 kobra 的 `U … -Umax Umax`；0 为原网格（电子 ±6，离子 ±0.15 v_Te = ±6.43 v_Ti）
 
 ## runtime_diags.csv 各列（每个粒子种类一组）
 - `ts`：时间 (τi)
@@ -76,4 +89,8 @@ quasi-kobra-sup 的 `naga/usr.c` 末尾加了 `diag_mon()`（`DIAG BEGIN` 到 `D
 tools/fetch_kobra.sh <标签> [kobra数据目录] [kobra算例.dat]   # 拷到 runs/kobra_<标签>/
 ~/plotenv/bin/python plot/KobraDiag.py runs/kobra_<标签> runs/Case25   # 对比图 KobraDiag.png + 终端汇总
 ```
+同分辨率对照：kobra 1000×256 ↔ Case27，512×256 ↔ Case28，256×128 ↔ Case29（VPcode 原格式，central）；
+同离散对照（`Scheme kobra`）：↔ Case30、Case31、Case32。
+VPcode 的净通量与 kobra 一样由粒子数求（−dN/dt / 2）：flux 列每 `OutDiag` 步采样一次，ω_pe Δt ~ 1 时电子通量的等离子体振荡会混叠。
+图中 Γe/Γi − 1 的净通量与贴壁格分两幅画（细线原始值，粗线 0.01 τi 滑动平均），时间轴只到 kobra 数据结束处。
 kobra 的净通量由 Γ = −dN/dt / 2 得到（内部守恒，两壁平均）；kobra 为单精度，离子到达壁面前的离子"净通量"是舍入噪声。

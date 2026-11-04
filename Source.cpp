@@ -63,7 +63,10 @@ void DeltaTimeSource::pulse(double t)
             double x = world.X(i);
             double v = world.V(j);
             sp.F(i, j) = 1. * pw * sqrt(m) * exp(-0.5 * x * x / sigma / sigma) * exp(-0.5 * v * v * m) / sqrt(2.0 * PI);
-            sp.F(i, j) = (sp.F(i, j) < 1e-10) ? 0 : sp.F(i, j); //* exp(-0.5 * v * v * m)
+            if (Const::scheme == "kobra")
+                sp.F(i, j) = std::max(sp.F(i, j), sp.fFloor); // 同 kobra: 不截断, 只抬到下限
+            else
+                sp.F(i, j) = (sp.F(i, j) < 1e-10) ? 0 : sp.F(i, j); //* exp(-0.5 * v * v * m)
         }
 
     // for (int j = 0; j < M; j++)

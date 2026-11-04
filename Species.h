@@ -76,6 +76,8 @@ public:
     double wallTemp = 0.;       // 壁面平行温度 (T_elm)
     double clipNeg = 0.;        // 累计被截断清零的负值质量 (n_elm*L_par)；PFC3 保正，非零说明通量有错
     double clipSmall = 0.;      // 累计被截断清零的小正值 (f < 1e-10) 质量
+    double fFloor = 0.;         // Scheme kobra: f 的下限 dfloor·m·λ² (同 kobra 的 usrfxp)，低于它的值被抬到 fFloor
+    double fluxAcc = 0., energyAcc = 0., timeAcc = 0.; // Scheme kobra: 两次诊断输出之间壁面通量 / 能流的时间积分
     dvector Maxwell;        // 垂直速度分布
 
     // topo : Log -> memory

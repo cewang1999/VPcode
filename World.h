@@ -54,6 +54,10 @@ namespace Const
 	extern int eFilter;
 	extern double spikeDump;	  // 电场能突跳诊断: 某步电场能 > SpikeDump × 上一步时存盘 (spike/), 0 表示关闭			  // 内部电场 (1,2,1)/4 二项式滤波次数 (不动贴壁 2 格), 0 表示不滤波
 	extern std::string wallE;	  // 壁面电场离散: central (原方案), onesided (贴壁格单侧电场 + 壁面面系数仅 λ²), kobra (同 quasi-kobra)
+	extern std::string scheme;	  // 输运与时间推进: PFC3 (原方案), kobra (同 quasi-kobra: MUSCL-Hancock + Strang 分裂 + 自适应 dt)
+	extern double dfloor;		  // Scheme kobra: kobra 的 dfloor (kobra 单位), f 下限为 dfloor·m·λ²
+	extern double cfl;			  // Scheme kobra: dt = CFL / max(|v|/dx, |qE/m|/dv)
+	extern double umax;			  // 速度网格 ±Umax 个热速度 (电子 v_Te, 离子 v_Ti), 0 表示原网格 (电子 ±6, 离子 ±0.15 v_Te)
 
 	void printMyself();
 	void readConst(string no);
@@ -134,6 +138,8 @@ public:
 		this->dt = dt;
 		this->num_ts = num_ts;
 	}
+	static void setDt(double _dt) { dt = _dt; } // Scheme kobra: 每步自适应 dt
+	int getNumTs() const { return num_ts; }
 
 	/*获取当前时间步*/
 	int getTs() const { return ts; }

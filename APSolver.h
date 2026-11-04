@@ -394,6 +394,7 @@ public:
     }
 
     double getElectricField(int i) const { return Ef.val(i); }
+    void setDt(double _dt) { dt = _dt; } // Scheme kobra: 自适应 dt
     // 诊断用：电势与 AP 方程所用的矩 (i 可取 -1 与 ni)
     double getPhi(int i) const { return phi.val(i); }
     double getRho(int i) const { return rho.val(i); }
