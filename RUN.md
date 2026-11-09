@@ -58,6 +58,8 @@ tail -f runs/Case4/log.txt
 | 40 | 1e-3 | 512, Nv = 256 | 自适应 | 0–0.6 τi | 同 Case36（MUSCL），`WallE onesided` |
 | 41 | 1e-3 | 1000, Nv = 256 | 自适应 | 0–1 τi | 同 Case33（MUSCL），`WallE onesided` |
 | 42 | 1e-3 | 512, Nv = 256 | 自适应 | 0–0.6 τi | 同 Case38（PFC3），`WallE onesided`：onesided 下后期升温消失，与输运格式无关 |
+| 43 | 1e-3 | 1000, Nv = 1000 | 自适应 | 0–4 τi | 与 kobra 1000×1000 完全相同的离散（同 Case30，Nv = 1000），工作站运行 |
+| 44 | 1e-3 | 1000, Nv = 1000 | 0.004 | 42850 | 文献方法：PFC3 + `WallE central` + 原时间推进（先解 φ^{n+1}，再 v、x），Δt = 4/ω_pe；同 Case26，只加 `Umax 6` 使速度网格与 kobra 相同，工作站运行 |
 
 ## case 文件可选参数（缺省值）
 - `lambda`（1e-3）：λ_D / L_par
