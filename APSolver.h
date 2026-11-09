@@ -69,6 +69,8 @@ private:
     // 壁面电场离散 (Const::wallE: central / onesided / kobra)
     bool onesided = false;
     bool kobraWall = false;
+    // 壁面面上的矩 (Const::wallMoment, 只作用于 central)：avg 为幽灵格与贴壁格平均，out 同 kobra (出射方向面值)
+    bool wallMomentOut = false;
 
     // 计算类型
     SolverType type;
@@ -193,8 +195,8 @@ private:
             b[i] = -(alphal + alphar);
             c[i] = alphar;
             d[i] = rhs;
-            if (kobraWall && (i == 0 || i == ni - 1))
-                assembleKobraWall(i);
+            if ((kobraWall || wallMomentOut) && (i == 0 || i == ni - 1))
+                assembleKobraWall(i, kobraWall ? -2.5 : -1., kobraWall ? 0.5 : 0.);
             // 边界: 幽灵点 phi_g = s*phi_inner, s=-1 Dirichlet(壁面phi=0), s=+1 Neumann
             if (i == 0)
             {
@@ -209,9 +211,10 @@ private:
         }
     }
     // 壁面行按 quasi-kobra (mug_kobra.c 的 init_mug_quasi / relax_quasi) 离散：
-    // 幽灵 φ_g = -2.5 φ_in + 0.5 φ_next；壁面面系数 λ² + dt² ρ_w (ρ_w 为出射方向面密度 Σ f/m)；
+    // 壁面面系数 λ² + dt² ρ_w (ρ_w 为出射方向面密度 Σ f/m)；
     // 壁面电流取壁面面通量（出射，面值 = 贴壁网格值）；壁面 ∂R 取入射方向的单侧估计 0.5 (7 f_in - f_next) v² / dx
-    void assembleKobraWall(int i)
+    // 幽灵 φ_g = gs φ_in + gn φ_next：kobra 为 (-2.5, 0.5)，central (WallMoment out) 为 (-1, 0)
+    void assembleKobraWall(int i, double gs, double gn)
     {
         double lamda2 = lamda * lamda, dx2 = dx * dx, dt2 = dt * dt;
         int s = (i == 0) ? 0 : 1;
@@ -243,16 +246,16 @@ private:
         {
             double alphar = 0.5 * (ntol.val(0) + ntol.val(1)) * dt2 + lamda2;
             a[i] = 0.;
-            b[i] = -alphar - 3.5 * aw;
-            c[i] = alphar + 0.5 * aw;
+            b[i] = -alphar + (gs - 1.) * aw;
+            c[i] = alphar + gn * aw;
             rhsw = rho.val(i) - dt * (jin - jw) / dx + dt2 * (kin - kw) / dx;
         }
         else
         {
             double alphal = 0.5 * (ntol.val(ni - 2) + ntol.val(ni - 1)) * dt2 + lamda2;
             c[i] = 0.;
-            b[i] = -alphal - 3.5 * aw;
-            a[i] = alphal + 0.5 * aw;
+            b[i] = -alphal + (gs - 1.) * aw;
+            a[i] = alphal + gn * aw;
             rhsw = rho.val(i) - dt * (jw - jin) / dx + dt2 * (kw + kin) / dx;
         }
         d[i] = -dx2 * rhsw;
@@ -349,6 +352,7 @@ public:
         dx = e.getWorld().getDx(), dt = e.getWorld().getDt();
         onesided = (Const::wallE == "onesided");
         kobraWall = (Const::wallE == "kobra");
+        wallMomentOut = (Const::wallMoment == "out") && (Const::wallE == "central");
         ni = e.getWorld().ni, nj = e.getWorld().nj;
 
         rho.resize(ni, nghosts);

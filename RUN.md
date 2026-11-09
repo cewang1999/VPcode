@@ -60,6 +60,7 @@ tail -f runs/Case4/log.txt
 | 42 | 1e-3 | 512, Nv = 256 | 自适应 | 0–0.6 τi | 同 Case38（PFC3），`WallE onesided`：onesided 下后期升温消失，与输运格式无关 |
 | 43 | 1e-3 | 1000, Nv = 1000 | 自适应 | 0–4 τi | 与 kobra 1000×1000 完全相同的离散（同 Case30，Nv = 1000），工作站运行 |
 | 44 | 1e-3 | 1000, Nv = 1000 | 0.004 | 42850 | 文献方法：PFC3 + `WallE central` + 原时间推进（先解 φ^{n+1}，再 v、x），Δt = 4/ω_pe；同 Case26，只加 `Umax 6` 使速度网格与 kobra 相同，工作站运行 |
+| 45 | 1e-3 | 1000, Nv = 1000 | 0.004 | 42850 | 同 Case44，加 `WallMoment out`：只把壁面面系数 / 面电流 / ∂R 换成出射方向面值（同 kobra），φ 幽灵格与 E₀ 仍为 central，工作站运行 |
 
 ## case 文件可选参数（缺省值）
 - `lambda`（1e-3）：λ_D / L_par
@@ -70,6 +71,8 @@ tail -f runs/Case4/log.txt
 - `EFilter`（0）：内部电场 (1,2,1)/4 二项式滤波次数，贴壁 2 格不滤
 - `SpikeDump`（0）：电场能突跳诊断。某步电场能超过上一步的 `SpikeDump` 倍时，在 `spike/ev<k>_` 下保存触发步的 fⁿ 与前一步 f^{n-1}（`fe_now/fe_prev/fi_now/fi_prev.txt`，格式同 `results/vlasov_*.txt`），以及触发前后各 20 步的场剖面 `prof.csv`（φ, E, ρ, J, R, Σf/m，含 i = −1 与 Nx 两个幽灵点）；最多 5 次
 - `WallE`（central）：贴壁格电场离散。`central`：原方案，E₀ = −(φ₁ − φ_g)/2dx，φ_g = −φ₀；`onesided`：E₀ = −(φ₁ − φ₀)/dx，且 AP 方程壁面面系数只保留 λ²（满足离散高斯定律，后期电子数值加热大幅减小）；`kobra`：与 quasi-kobra 的 mug_kobra.c 相同（幽灵 φ_g = −2.5φ₀ + 0.5φ₁，壁面电流取壁面面通量，壁面 ∂R 单侧估计）
+- `WallMoment`（avg）：只对 `WallE central` 起作用，AP 方程壁面面上的矩。`avg`：原方案，壁面面系数 λ² + Δt²·½(n_幽灵 + n₀)、面电流 ½(J_幽灵 + J₀)、∂R 用幽灵格中心差分（幽灵格只含出射方向的 f，相当于 n_out + ½n_in、J_out + ½J_in）；
+  `out`：与 kobra 相同，面系数 λ² + Δt²·n_out/m、面电流 J_out、∂R 取入射方向单侧估计；φ 幽灵格（φ_g = −φ₀）与贴壁格 E₀ 不变
 - `Scheme`（PFC3）：输运与时间推进。`kobra`：与 quasi-kobra 相同——x、v 方向均为 MUSCL-Hancock（kobra 的 van Albada 斜率 `av`，即 `semi`），
   x 吸收壁按 kobra 的 `usrbd`（出射面值 = 贴壁格值，入射面值 = 下限），v 方向 FREE 边界；
   每步 dt = `CFL` / max(|v|/dx, |qE/m|/dv)（只统计 f 高于下限的格，同 `usrtimestep`），由 fⁿ 解 φ 后做 Strang 分裂 x(dt/2) → v(dt) → x(dt/2)；

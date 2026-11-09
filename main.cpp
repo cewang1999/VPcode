@@ -75,7 +75,7 @@ int main(int argc, char *argv[])
     {
         double cflx = world.getVmax() * world.getDt() / world.getDx();
         cout << "Case" << Case << ": Nx=" << Nx << " Nv=" << Nv << " dt=" << world.getDt()
-             << " lambda=" << Const::lamda << " WallFace=" << Const::wallFace << " WallE=" << Const::wallE << " EFilter=" << Const::eFilter << " SpikeDump=" << Const::spikeDump << " VCFL=" << Const::vcfl
+             << " lambda=" << Const::lamda << " WallFace=" << Const::wallFace << " WallE=" << Const::wallE << " WallMoment=" << Const::wallMoment << " EFilter=" << Const::eFilter << " SpikeDump=" << Const::spikeDump << " VCFL=" << Const::vcfl
              << " Scheme=" << Const::scheme << " v: e ±" << ve << ", i ±" << vi
              << " | electron x-CFL(v_max)=" << cflx << endl;
         if (kobra)

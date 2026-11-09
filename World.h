@@ -54,6 +54,7 @@ namespace Const
 	extern int eFilter;
 	extern double spikeDump;	  // 电场能突跳诊断: 某步电场能 > SpikeDump × 上一步时存盘 (spike/), 0 表示关闭			  // 内部电场 (1,2,1)/4 二项式滤波次数 (不动贴壁 2 格), 0 表示不滤波
 	extern std::string wallE;	  // 壁面电场离散: central (原方案), onesided (贴壁格单侧电场 + 壁面面系数仅 λ²), kobra (同 quasi-kobra)
+	extern std::string wallMoment; // WallE central 时壁面面上的矩: avg (原方案, 幽灵格与贴壁格平均), out (同 kobra: 出射方向面值, ∂R 取入射方向单侧估计)
 	extern std::string scheme;	  // 输运与时间推进: PFC3 (原方案), kobra (同 quasi-kobra: MUSCL-Hancock + Strang 分裂 + 自适应 dt)
 	extern std::string flux;	  // Scheme kobra 下的输运格式: MUSCL (同 kobra), PFC3 (VPcode 原格式, 壁面出射面值见 WallFace)
 	extern double dfloor;		  // Scheme kobra: kobra 的 dfloor (kobra 单位), f 下限为 dfloor·m·λ²
