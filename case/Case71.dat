@@ -1,0 +1,23 @@
+# Const number
+
+L           55
+n           3.2e19
+T           150
+sigma       10
+Nx          280
+Nv          500
+theta       90
+SolverType  AP
+dt          0.0005
+num_ts      342800
+lambda      0.001
+WallFace    PFC3
+VCFL        0
+OutDiag     10
+OutF        34280
+WallE       central
+Umax        6
+XGrid       refine
+DxWall      0.5
+DxBulk      8
+NRefine     1
