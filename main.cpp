@@ -48,22 +48,24 @@ int main(int argc, char *argv[])
     double ve = 6., vi = 0.15;
     if (Const::umax > 0.)
         ve = Const::umax, vi = Const::umax / sqrt(Const::m_H);
-    // XGrid stretch：壁面细、体区粗的非均匀 x 网格，Nx 由网格参数算出 (case 中的 Nx 不用)
-    const bool stretchX = (Const::xgrid == "stretch");
+    // XGrid stretch / refine：壁面细、体区粗的非均匀 x 网格，Nx 由网格参数算出 (case 中的 Nx 不用)
+    //   stretch: 壁面等宽区 + 等比过渡 + 体区；refine: 均匀粗网格，每侧壁面 NRefine 个粗格各等分为 DxBulk/DxWall 个细格
+    const bool refineX = (Const::xgrid == "refine");
+    const bool stretchX = (Const::xgrid == "stretch") || refineX;
     dvector xfaces;
     if (stretchX)
     {
         if (Const::scheme == "kobra")
         {
-            cerr << "XGrid stretch 不支持 Scheme kobra" << endl;
+            cerr << "XGrid " << Const::xgrid << " 不支持 Scheme kobra" << endl;
             return 1;
         }
-        xfaces = Const::buildStretchedFaces();
+        xfaces = refineX ? Const::buildRefinedFaces() : Const::buildStretchedFaces();
         Nx = (int)xfaces.size() - 1;
     }
     else if (Const::xgrid != "uniform")
     {
-        cerr << "XGrid 只能为 uniform 或 stretch" << endl;
+        cerr << "XGrid 只能为 uniform、stretch 或 refine" << endl;
         return 1;
     }
 
@@ -82,9 +84,13 @@ int main(int argc, char *argv[])
             if (i > 0)
                 rmax = std::max(rmax, std::max(world.Dx(i) / world.Dx(i - 1), world.Dx(i - 1) / world.Dx(i)));
         }
-        cout << "XGrid stretch: Nx = " << Nx << ", dx " << world.getDx() / Const::lamda << " – " << hmax / Const::lamda
-             << " λ (DxWall " << Const::dxWall << ", WallWidth " << Const::wallWidth << ", DxBulk " << Const::dxBulk
-             << ", Stretch " << Const::stretch << "), 相邻格宽比最大 " << rmax << endl;
+        cout << "XGrid " << Const::xgrid << ": Nx = " << Nx << ", dx " << world.getDx() / Const::lamda << " – " << hmax / Const::lamda
+             << " λ (DxWall " << Const::dxWall << ", DxBulk " << Const::dxBulk;
+        if (refineX)
+            cout << ", NRefine " << Const::nRefine << " → 每侧细网格 " << Const::nRefine * Const::dxBulk << " λ";
+        else
+            cout << ", WallWidth " << Const::wallWidth << ", Stretch " << Const::stretch;
+        cout << "), 相邻格宽比最大 " << rmax << endl;
     }
 
     vector<Species> species;

@@ -46,6 +46,7 @@ namespace Const
 	double dxBulk = 16.;
 	double wallWidth = 50.;
 	double stretch = 1.05;
+	int nRefine = 1;
 	int eFilter = 0;
 	double spikeDump = 0.;
 }
@@ -123,6 +124,8 @@ void Const::readConst(string no)
 			record >> Const::wallWidth;
 		else if (param == "Stretch")
 			record >> Const::stretch;
+		else if (param == "NRefine")
+			record >> Const::nRefine;
 		else if (param == "EFilter")
 			record >> Const::eFilter;
 		else if (param == "SpikeDump")
@@ -344,6 +347,35 @@ std::vector<double> Const::buildStretchedFaces()
 	for (int k = (int)hs.size() - 1; k >= 0; k--)
 		faces.push_back(faces.back() + hs[k]);
 	faces.back() = 1.;
+	return faces;
+}
+
+std::vector<double> Const::buildRefinedFaces()
+{
+	// 粗网格: [-1, 1] 均匀 Nc 格 (格宽 DxBulk λ)；每侧壁面最近的 NRefine 个粗格各等分为 r = DxBulk/DxWall 个细格。
+	// 细格面与粗格面严格重合 (粗细界面在粗网格面上)，便于移植为 "粗网格 + 壁面细网格块"
+	double ncD = 2. / (dxBulk * lamda), rD = dxBulk / dxWall;
+	int nc = (int)std::lround(ncD), r = (int)std::lround(rD);
+	if (dxWall <= 0. || std::fabs(ncD - nc) > 1e-6 * ncD || std::fabs(rD - r) > 1e-9 * rD || r < 1)
+	{
+		cerr << "XGrid refine: 需要 2/(DxBulk·λ) 与 DxBulk/DxWall 均为整数 (当前 " << ncD << ", " << rD << ")" << endl;
+		exit(1);
+	}
+	if (nRefine < 0 || 2 * nRefine > nc)
+	{
+		cerr << "XGrid refine: NRefine 需在 0 … Nc/2 之间 (Nc = " << nc << ")" << endl;
+		exit(1);
+	}
+	double H = 2. / nc;
+	std::vector<double> faces;
+	for (int k = 0; k < nc; k++)
+	{
+		double xl = -1. + k * H;
+		int sub = (k < nRefine || k >= nc - nRefine) ? r : 1;
+		for (int m = 0; m < sub; m++)
+			faces.push_back(xl + H * m / sub);
+	}
+	faces.push_back(1.);
 	return faces;
 }
 

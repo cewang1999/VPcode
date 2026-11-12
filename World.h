@@ -66,7 +66,9 @@ namespace Const
 	extern double dxBulk;		  // stretch: 体区格宽 (λ)
 	extern double wallWidth;	  // stretch: 壁面等宽细网格区宽度 (λ)
 	extern double stretch;		  // stretch: 过渡区相邻格宽之比
+	extern int nRefine;			  // refine: 每侧壁面细分的粗格个数
 	std::vector<double> buildStretchedFaces(); // stretch 网格的网格面坐标 (-1 … 1)
+	std::vector<double> buildRefinedFaces();   // refine 网格: 均匀粗网格 (DxBulk)，每侧壁面 NRefine 个粗格各等分为 DxBulk/DxWall 个细格
 
 	void printMyself();
 	void readConst(string no);
