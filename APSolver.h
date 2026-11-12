@@ -71,6 +71,7 @@ private:
     bool onesided = false;
     bool kobraWall = false;
     // 壁面面上的矩 (Const::wallMoment, 只作用于 central)：avg 为幽灵格与贴壁格平均，out 同 kobra (出射方向面值)
+    bool nonuni = false; // 非均匀 x 网格 (XGrid stretch)
     bool wallMomentOut = false;
 
     // 计算类型
@@ -264,6 +265,49 @@ private:
         d[i] = -dx2 * rhsw;
     }
 
+    // 非均匀 x 网格的有限体积组装 (h_i 为格宽，d± 为相邻格中心距)：
+    //   α_{i+½}(φ_{i+1}-φ_i)/d+ - α_{i-½}(φ_i-φ_{i-1})/d- = -h_i ρ_i + Δt (J_{i+½} - J_{i-½}) - Δt² (∂R_{i+½} - ∂R_{i-½})
+    // 面值 (n/m、J) 按格宽线性插值，∂R 为两格中心差分；均匀网格时乘以 dx 即 assembleMatrix
+    void assembleMatrixNU()
+    {
+        const World &w = species[0].getWorld();
+        const double dt = apDt(), dt2 = dt * dt, lamda2 = lamda * lamda;
+        auto face = [&](const Moment &q, int i) // 面 i+½ 上的线性插值
+        {
+            double hl = w.Dx(i), hr = w.Dx(i + 1);
+            return (hr * q.val(i) + hl * q.val(i + 1)) / (hl + hr);
+        };
+        for (int i = 0; i < ni; ++i)
+        {
+            double dp = w.X(i + 1) - w.X(i), dm = w.X(i) - w.X(i - 1);
+            double alphal = lamda2 + dt2 * face(ntol, i - 1);
+            double alphar = lamda2 + dt2 * face(ntol, i);
+            if (onesided)
+            {
+                if (i == 0)
+                    alphal = lamda2;
+                if (i == ni - 1)
+                    alphar = lamda2;
+            }
+            double jdiv = face(nu, i) - face(nu, i - 1);
+            double rdiv = (nuu.val(i + 1) - nuu.val(i)) / dp - (nuu.val(i) - nuu.val(i - 1)) / dm;
+            a[i] = alphal / dm;
+            c[i] = alphar / dp;
+            b[i] = -(a[i] + c[i]);
+            d[i] = -w.Dx(i) * rho.val(i) + dt * jdiv - dt2 * rdiv;
+            if (i == 0)
+            {
+                b[i] += (bc[0] == EF_DIRI ? -1. : 1.) * a[i];
+                a[i] = 0.;
+            }
+            if (i == ni - 1)
+            {
+                b[i] += (bc[1] == EF_DIRI ? -1. : 1.) * c[i];
+                c[i] = 0.;
+            }
+        }
+    }
+
     void assembleMatrixForIter()
     {
         double lamda2 = lamda * lamda;
@@ -290,6 +334,22 @@ private:
 
     void computeElectricField()
     {
+        if (nonuni)
+        {
+            // 非均匀网格二阶中心差分；贴壁格的幽灵格宽度与贴壁格相同 (镜像)，壁面处与均匀网格相同
+            const World &w = species[0].getWorld();
+            for (int i = 0; i < ni; i++)
+            {
+                double dp = w.X(i + 1) - w.X(i), dm = w.X(i) - w.X(i - 1);
+                Ef.val(i) = -(dm * dm * (phi.val(i + 1) - phi.val(i)) + dp * dp * (phi.val(i) - phi.val(i - 1))) / (dp * dm * (dp + dm));
+            }
+            if (onesided)
+            {
+                Ef.val(0) = -(phi.val(1) - phi.val(0)) / (w.X(1) - w.X(0));
+                Ef.val(ni - 1) = -(phi.val(ni - 1) - phi.val(ni - 2)) / (w.X(ni - 1) - w.X(ni - 2));
+            }
+            return;
+        }
         for (int i = 0; i < ni; i++)
             Ef.val(i) = -(phi.val(i + 1) - phi.val(i - 1)) / (2. * dx);
         if (kobraWall)
@@ -356,6 +416,12 @@ public:
         onesided = (Const::wallE == "onesided");
         kobraWall = (Const::wallE == "kobra");
         wallMomentOut = (Const::wallMoment == "out") && (Const::wallE == "central");
+        nonuni = e.getWorld().isNonuniform();
+        if (nonuni && (kobraWall || wallMomentOut || Const::eFilter > 0 || !(type == AP || type == Poisson)))
+        {
+            cerr << "XGrid stretch 只支持 SolverType AP / Poisson，WallE central / onesided，WallMoment avg，EFilter 0" << endl;
+            exit(1);
+        }
         ni = e.getWorld().ni, nj = e.getWorld().nj;
 
         rho.resize(ni, nghosts);
@@ -414,8 +480,9 @@ public:
     double getElectricEnergy()
     {
         double val = 0;
+        const World &w = species[0].getWorld();
         for (int i = 0; i < ni; i++)
-            val += Ef.val(i) * Ef.val(i) * dx;
+            val += Ef.val(i) * Ef.val(i) * w.Dx(i);
 
         return val;
     }

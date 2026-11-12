@@ -101,7 +101,7 @@ double Species::gettotalKE()
         for (int j = 0; j < M; j++)
         {
             double v = world.V(j);
-            val += 0.5 * mass * F(i, j) * v * v * dx * dv;
+            val += 0.5 * mass * F(i, j) * v * v * world.Dx(i) * dv;
             // val_t1 += 0.5 * 0.25 * (f[i][j] + f[i][j + 1] + f[i + 1][j] + f[i + 1][j + 1]) * dx * dv;
         }
 
@@ -125,10 +125,14 @@ double Species::gettotalnumber()
 {
     double val = 0;
     for (int i = 0; i < world.ni; i++)
+    {
+        double row = 0;
         for (int j = 0; j < world.nj; j++)
-            val += F(i, j);
+            row += F(i, j);
+        val += row * world.Dx(i);
+    }
 
-    return val * world.getDx() * world.getDv(); // 归一化系数：(n_elm*L_par)
+    return val * world.getDv(); // 归一化系数：(n_elm*L_par)
 }
 
 // 边界设置

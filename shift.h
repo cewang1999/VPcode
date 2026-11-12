@@ -42,6 +42,7 @@ public:
     void fillGhostCells() { return sp.fillGhostCellsX(); } // 填充 X 方向幽灵网格，call to Specie 函数
     void computeFlux();                                    // 计算 X 方向 Flux
     void computeFlux(int i, int j);                        // 计算 (i,j) 处 Flux
+    void computeFluxNU(int i, int j);                      // 非均匀 x 网格上的 PFC3 通量 (可跨越多格)
     void updateInteriorCells();                            // 填充 X 方向所有网格
     void advection();
     void advectionKobra();             // Flux MUSCL: MUSCL-Hancock (van Albada 斜率) + kobra 吸收壁, 推进 dt

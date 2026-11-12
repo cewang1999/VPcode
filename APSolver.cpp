@@ -31,7 +31,7 @@ SolverType stringToEnum(const std::string &str)
 bool APSolver::solverAP()
 {
     computeMoments();
-    assembleMatrix();
+    nonuni ? assembleMatrixNU() : assembleMatrix();
 
     // Forward sweep
     c_star[0] = c[0] / b[0];

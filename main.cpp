@@ -48,10 +48,44 @@ int main(int argc, char *argv[])
     double ve = 6., vi = 0.15;
     if (Const::umax > 0.)
         ve = Const::umax, vi = Const::umax / sqrt(Const::m_H);
+    // XGrid stretch：壁面细、体区粗的非均匀 x 网格，Nx 由网格参数算出 (case 中的 Nx 不用)
+    const bool stretchX = (Const::xgrid == "stretch");
+    dvector xfaces;
+    if (stretchX)
+    {
+        if (Const::scheme == "kobra")
+        {
+            cerr << "XGrid stretch 不支持 Scheme kobra" << endl;
+            return 1;
+        }
+        xfaces = Const::buildStretchedFaces();
+        Nx = (int)xfaces.size() - 1;
+    }
+    else if (Const::xgrid != "uniform")
+    {
+        cerr << "XGrid 只能为 uniform 或 stretch" << endl;
+        return 1;
+    }
+
     World world(Nx, Nv);
     world.setExtents(-1., 1., -ve, ve);
     World world_D(Nx, Nv);
     world_D.setExtents(-1., 1., -vi, vi);
+    if (stretchX)
+    {
+        world.setXFaces(xfaces);
+        world_D.setXFaces(xfaces);
+        double hmax = 0., rmax = 1.;
+        for (int i = 0; i < Nx; ++i)
+        {
+            hmax = std::max(hmax, world.Dx(i));
+            if (i > 0)
+                rmax = std::max(rmax, std::max(world.Dx(i) / world.Dx(i - 1), world.Dx(i - 1) / world.Dx(i)));
+        }
+        cout << "XGrid stretch: Nx = " << Nx << ", dx " << world.getDx() / Const::lamda << " – " << hmax / Const::lamda
+             << " λ (DxWall " << Const::dxWall << ", WallWidth " << Const::wallWidth << ", DxBulk " << Const::dxBulk
+             << ", Stretch " << Const::stretch << "), 相邻格宽比最大 " << rmax << endl;
+    }
 
     vector<Species> species;
     species.reserve(2);
@@ -77,7 +111,7 @@ int main(int argc, char *argv[])
         cout << "Case" << Case << ": Nx=" << Nx << " Nv=" << Nv << " dt=" << world.getDt()
              << " lambda=" << Const::lamda << " WallFace=" << Const::wallFace << " WallE=" << Const::wallE << " WallMoment=" << Const::wallMoment << " EFilter=" << Const::eFilter << " SpikeDump=" << Const::spikeDump << " VCFL=" << Const::vcfl
              << " Scheme=" << Const::scheme << " v: e ±" << ve << ", i ±" << vi
-             << " | electron x-CFL(v_max)=" << cflx << endl;
+             << " | electron x-CFL(v_max, 最小格)=" << cflx << endl;
         if (kobra)
             cout << "Scheme kobra (Flux " << Const::flux << "): dt = " << Const::cfl << " / max(|v|/dx, |qE/m|/dv), f floor e " << e.fFloor
                  << ", i " << D.fFloor << ", t_end = " << world.getDt() * world.getNumTs() << endl;

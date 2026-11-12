@@ -8,6 +8,36 @@ namespace
     {
         return (b * a < tiny) ? 0. : a * b * (a + b) / (a * a + b * b);
     }
+
+    // PFC3 的斜率修正 (同 FluxCalculator.h 的 PFC3FLUX)
+    inline double pfcEpsR(double fR, double fL, double fmax)
+    {
+        double df = fR - fL;
+        return (df > 1e-30) ? std::max(std::min(1., 2. * fL / df), 0.) : std::max(std::min(1., -2. * (fmax - fL) / df), 0.);
+    }
+    inline double pfcEpsL(double fR, double fL, double fmax)
+    {
+        double df = fR - fL;
+        return (df > 1e-30) ? std::max(std::min(1., 2. * (fmax - fR) / df), 0.) : std::max(std::min(1., -2. * fR / df), 0.);
+    }
+
+    // 非均匀网格 PFC3：格 c (宽 h，左右邻格宽 hl, hr) 内的抛物线 p 与三格平均值 fl, f0, fr 一致，
+    // 返回 p 在格内右端 (right) 或左端长度 len 上的平均值。p - f0 = c1 s + c2 (s² - h²/12) (s 为距格中心距离)
+    // 对差分 Dr = fr - f0、Dl = f0 - fl 是线性的，两项各乘 PFC3 的斜率修正 (均匀网格时与 PFC3FLUX 完全一致)
+    inline double pfcPartialAvg(double fl, double f0, double fr, double hl, double h, double hr,
+                                double len, bool right, double fmax)
+    {
+        double h2 = 0.5 * h;
+        double Ql = ((h2 + hl) * (h2 + hl) * (h2 + hl) - h2 * h2 * h2) / (3. * hl) - h * h / 12.;
+        double Qr = ((h2 + hr) * (h2 + hr) * (h2 + hr) - h2 * h2 * h2) / (3. * hr) - h * h / 12.;
+        double gl = 0.5 * (h + hl), gr = 0.5 * (h + hr);
+        double det = gr * Ql + gl * Qr;
+        double ms = (right ? 0.5 : -0.5) * (h - len);            // s 的平均
+        double S = h * h / 6. - 0.5 * h * len + len * len / 3.; // (s² - h²/12) 的平均
+        double wR = (Ql * ms + gl * S) / det;
+        double wL = (Qr * ms - gr * S) / det;
+        return f0 + pfcEpsR(fr, f0, fmax) * wR * (fr - f0) + pfcEpsL(f0, fl, fmax) * wL * (f0 - fl);
+    }
     inline double kobraTiny(const Species &sp) { return 1e-30 * pow(Const::lamda, 4) * sp.mass; }
 
     // kobra 的 step(): 由旧值 q[1..n] 与幽灵 q[0], q[n+1] 求斜率 diff = av(右差, 左差)，
@@ -138,11 +168,12 @@ void ShiftV::advectionKobra()
 
 void ShiftX::computeFlux()
 {
+    const bool nu = world.isNonuniform();
 #pragma omp parallel for schedule(static)
     for (int j = 0; j < nj; ++j)
     {
         for (int i = 0; i < ni; ++i)
-            computeFlux(i, j);
+            nu ? computeFluxNU(i, j) : computeFlux(i, j);
     }
 }
 
@@ -206,6 +237,48 @@ void ShiftX::computeFlux(int i, int j)
     }
 }
 
+void ShiftX::computeFluxNU(int i, int j)
+{
+    // 守恒半拉格朗日：面 i 在 dt 内的通量 = 出发点 X = x_face - v dt 到面之间的质量 / dt
+    //   = (中间整格的 Σ f h + 出发点所在格的部分积分) / dt，出发点可越过任意多格 (全局 dt，无 CFL < 1 限制)
+    double v = world.V(j);
+    if (fabs(v) <= 1e-30)
+    {
+        flux[i][j] = 0.;
+        return;
+    }
+    double xface = world.XF(i);
+    double X = std::min(std::max(xface - dt * v, world.XF(-1)), world.XF(world.ni + 1)); // 出口外 f = 0 (幽灵格入射方向为 0)
+    int c = world.findCellX(X);
+    double mass = 0., len;
+    bool right = (v > 0);
+    if (right)
+    {
+        c = std::max(std::min(c, i - 1), -1); // 出发点不能落到面右侧 (舍入)
+        for (int k = c + 1; k <= i - 1; ++k)
+            mass += sp.F(k, j) * world.Dx(k);
+        len = world.XF(c + 1) - X;
+    }
+    else
+    {
+        c = std::min(std::max(c, i), world.ni);
+        for (int k = i; k <= c - 1; ++k)
+            mass += sp.F(k, j) * world.Dx(k);
+        len = X - world.XF(c);
+    }
+    len = std::min(std::max(len, 0.), world.Dx(c));
+    double part = len * pfcPartialAvg(sp.F(c - 1, j), sp.F(c, j), sp.F(c + 1, j),
+                                      world.Dx(c - 1), world.Dx(c), world.Dx(c + 1), len, right, maxlimiter[j]);
+    flux[i][j] = (right ? 1. : -1.) * (part + mass) / dt;
+    if (upwindWall)
+    {
+        if (i == 0 && v < 0)
+            flux[i][j] = v * sp.F(0, j);
+        else if (i == ni - 1 && v > 0)
+            flux[i][j] = v * sp.F(world.ni - 1, j);
+    }
+}
+
 void ShiftX::collectStencil(double v, vec2<int> join, vector<double> &stencil)
 {
     int left_size = flux_calc->getLeftStencilSize();
@@ -257,11 +330,12 @@ void ShiftX::updateInteriorCells()
     for (int j = 0; j < _nj; ++j)
         for (int i = 0; i < _ni; ++i)
         {
-            double div_x = (flux[i + 1][j] - flux[i][j]) / dx;
+            double hx = world.Dx(i); // 均匀网格时与 dx 相同
+            double div_x = (flux[i + 1][j] - flux[i][j]) / hx;
             double val = sp.F(i, j) - dt * div_x;
             if (val < 1e-10)
             {
-                (val < 0. ? neg : small) += fabs(val) * dx * dv; // 记录截断量
+                (val < 0. ? neg : small) += fabs(val) * hx * dv; // 记录截断量
                 val = 0.;
             }
             sp.F(i, j) = val;
@@ -441,7 +515,7 @@ void ShiftV::fillGhostRow(int i)
 void ShiftV::advectRow(int i, double dtl, double &neg, double &small)
 {
     int _nj = world.nj;
-    double dv = world.getDv(), dx = world.getDx();
+    double dv = world.getDv(), dx = world.Dx(i);
 
     if (flux_calc->isHighOrder())
     {

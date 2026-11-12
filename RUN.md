@@ -73,6 +73,11 @@ tail -f runs/Case4/log.txt
 | 55 | 1e-3 | 4000, Nv = 1000 | 0.001 | 171400 | 同 Case52，`SolverType Poisson`：ω_pe Δt = 1 |
 | 56 | 1e-3 | 4000, Nv = 1000 | 0.002 | 85700 | 同 Case51，`SolverType Poisson`：ω_pe Δt = 2，显式稳定极限，预计发散（AP 的意义所在） |
 | 57 | 1e-3 | 4000, Nv = 1000 | 0.00025 | 685600 | 同 Case53，`SolverType Poisson`：ω_pe Δt = 0.25 |
+| 58 | 1e-3 | stretch → 724, Nv = 1000 | 0.0005 | 342800 | 同 Case50，非均匀 x 网格：壁面 50λ 内 0.5λ，按 1.05 渐变到体区 4λ，约 1.2 h |
+| 59 | 1e-3 | stretch → 512, Nv = 1000 | 0.0005 | 342800 | 同 Case58，体区 8λ，约 0.9 h |
+| 60 | 1e-3 | stretch → 422, Nv = 1000 | 0.0005 | 342800 | 同 Case58，体区 16λ（源宽 σ = 100λ 内约 6 格），约 0.7 h |
+
+Case58–60 与 Case50 只差 x 网格（壁面格宽相同 0.5λ），用于检验"只在壁面加密"能否复现标杆结果、体区最粗能用多少。
 
 Case51–53 的 OutDiag / OutF 按 Δt 调整，使诊断间隔（约 0.004–0.005）和分布函数输出次数（10 次）与 Case50 相同。
 Δt = 0.004（ω_pe Δt = 4，x-CFL = 48）在 Nx = 4000 下于 t ≈ 0.008 τi 发散（见下），不列入扫描。
@@ -83,6 +88,9 @@ Case46–48 的 Δt 统一取 0.0005（x-CFL = 1.5 / 6 / 12）：Nx = 4000 时 �
 ## case 文件可选参数（缺省值）
 - `SolverType`（必填）：`AP`（渐近保持重构泊松）或 `Poisson`（标准泊松 λ²φ'' = -ρ：同一 Thomas 求解器、壁面离散与电场计算，只去掉 Δt²n/m、Δt∂J、Δt²∂²R 项；显式格式要求 ω_pe Δt < 2 且 Δx ≲ λ）。旧的 `SOR` / `SORAP` / `DS` / `Thomas` 未维护，不要使用
 - `lambda`（1e-3）：λ_D / L_par
+- `XGrid`（uniform）：`uniform` 为 Nx 等分；`stretch` 为非均匀 x 网格（壁面细、体区粗，Nx 由下列参数算出，case 中的 Nx 不用）。x 输运为非均匀网格上的守恒半拉格朗日 PFC3（全局 Δt，可跨越多格），AP / 泊松方程为非均匀有限体积；只支持 Scheme PFC3、SolverType AP / Poisson、WallE central / onesided、WallMoment avg、EFilter 0
+- `DxWall`（0.5）、`WallWidth`（50）、`DxBulk`（16）：stretch 网格的壁面格宽、壁面等宽区宽度、体区格宽，单位 λ
+- `Stretch`（1.05）：stretch 网格过渡区相邻格宽之比
 - `WallFace`（PFC3）：`PFC3` 或 `upwind1`（要求 x-CFL < 1）
 - `VCFL`（0）：v 方向子循环的 CFL 上限，0 为不子循环
 - `OutDiag`（10）：`runtime_diags.csv` 输出间隔（步）

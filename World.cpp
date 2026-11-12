@@ -41,6 +41,11 @@ namespace Const
 	double dfloor = 1e-10;
 	double cfl = 0.9;
 	double umax = 0.;
+	string xgrid = "uniform";
+	double dxWall = 0.5;
+	double dxBulk = 16.;
+	double wallWidth = 50.;
+	double stretch = 1.05;
 	int eFilter = 0;
 	double spikeDump = 0.;
 }
@@ -108,6 +113,16 @@ void Const::readConst(string no)
 			record >> Const::cfl;
 		else if (param == "Umax")
 			record >> Const::umax;
+		else if (param == "XGrid")
+			record >> Const::xgrid;
+		else if (param == "DxWall")
+			record >> Const::dxWall;
+		else if (param == "DxBulk")
+			record >> Const::dxBulk;
+		else if (param == "WallWidth")
+			record >> Const::wallWidth;
+		else if (param == "Stretch")
+			record >> Const::stretch;
 		else if (param == "EFilter")
 			record >> Const::eFilter;
 		else if (param == "SpikeDump")
@@ -259,6 +274,77 @@ void World::setExtents(const double _xmin, const double _xmax, const double _vmi
 	/*caculate v(i) vel*/
 	for (int i = -nghosts; i < nj + nghosts; i++)
 		V(i) = vmin + 0.5 * dv + i * dv;
+
+	/*均匀 x 网格的网格面与格宽 (与非均匀网格共用接口)*/
+	xf.assign(ni_total + 1, 0.);
+	h.assign(ni_total, dx);
+	for (int k = 0; k <= ni_total; k++)
+		xf[k] = xmin + (k - nghosts) * dx;
+}
+
+void World::setXFaces(const dvector &faces)
+{
+	if ((int)faces.size() != ni + 1)
+	{
+		cerr << "setXFaces: faces.size() != ni + 1" << endl;
+		exit(1);
+	}
+	nonuniform = true;
+	for (int i = 0; i < ni; i++)
+		h[xIdx(i)] = faces[i + 1] - faces[i];
+	for (int k = 1; k <= nghosts; k++) // 幽灵格宽度按壁面镜像：幽灵格中心与贴壁格中心关于壁面对称
+	{
+		h[xIdx(-k)] = h[xIdx(k - 1)];
+		h[xIdx(ni + k - 1)] = h[xIdx(ni - k)];
+	}
+	xf[xIdx(0)] = faces[0];
+	for (int i = 0; i < ni + nghosts; i++)
+		xf[xIdx(i + 1)] = (i < ni) ? faces[i + 1] : xf[xIdx(i)] + h[xIdx(i)];
+	for (int i = -1; i >= -nghosts; i--)
+		xf[xIdx(i)] = xf[xIdx(i + 1)] - h[xIdx(i)];
+	for (int i = -nghosts; i < ni + nghosts; i++)
+		X(i) = 0.5 * (xf[xIdx(i)] + xf[xIdx(i + 1)]);
+	dx = *std::min_element(h.begin() + nghosts, h.end() - nghosts);
+}
+
+std::vector<double> Const::buildStretchedFaces()
+{
+	// 半个区域 (壁面 s = 0 到中心 s = 1)：壁面区等宽 hw，过渡区按 stretch 等比增大到 hb，体区等宽 (调整到恰好填满)
+	double hw = dxWall * lamda, hb = dxBulk * lamda, W = wallWidth * lamda, r = stretch;
+	if (hw <= 0. || hb < hw || (hb > hw && r <= 1.))
+	{
+		cerr << "XGrid stretch: 需要 0 < DxWall <= DxBulk，且 DxBulk > DxWall 时 Stretch > 1" << endl;
+		exit(1);
+	}
+	std::vector<double> hs;
+	double s = 0.;
+	while (s + hw <= W * (1. + 1e-12) && s + hw < 1.)
+	{
+		hs.push_back(hw);
+		s += hw;
+	}
+	for (double hh = hw * r; hb > hw * (1. + 1e-12) && hh < hb; hh *= r)
+	{
+		hs.push_back(hh);
+		s += hh;
+	}
+	double R = 1. - s;
+	if (R <= 0.)
+	{
+		cerr << "XGrid stretch: 壁面区 + 过渡区超过半个区域" << endl;
+		exit(1);
+	}
+	int nb = std::max(1, (int)std::ceil(R / hb * (1. - 1e-12)));
+	for (int k = 0; k < nb; k++)
+		hs.push_back(R / nb);
+	std::vector<double> faces(1, -1.);
+	for (double hh : hs)
+		faces.push_back(faces.back() + hh);
+	faces.back() = 0.;
+	for (int k = (int)hs.size() - 1; k >= 0; k--)
+		faces.push_back(faces.back() + hs[k]);
+	faces.back() = 1.;
+	return faces;
 }
 
 void World::printMySelf()

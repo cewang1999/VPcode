@@ -3,6 +3,7 @@
 #include "Field.h"
 #include <math.h>
 #include <chrono>
+#include <algorithm>
 #define PI 3.1415926535
 // 相关常数
 namespace Const
@@ -60,6 +61,12 @@ namespace Const
 	extern double dfloor;		  // Scheme kobra: kobra 的 dfloor (kobra 单位), f 下限为 dfloor·m·λ²
 	extern double cfl;			  // Scheme kobra: dt = CFL / max(|v|/dx, |qE/m|/dv)
 	extern double umax;			  // 速度网格 ±Umax 个热速度 (电子 v_Te, 离子 v_Ti), 0 表示原网格 (电子 ±6, 离子 ±0.15 v_Te)
+	extern std::string xgrid;	  // x 网格: uniform (Nx 等分) 或 stretch (壁面细、体区粗, 下列参数, Nx 由此算出)
+	extern double dxWall;		  // stretch: 壁面区格宽 (λ)
+	extern double dxBulk;		  // stretch: 体区格宽 (λ)
+	extern double wallWidth;	  // stretch: 壁面等宽细网格区宽度 (λ)
+	extern double stretch;		  // stretch: 过渡区相邻格宽之比
+	std::vector<double> buildStretchedFaces(); // stretch 网格的网格面坐标 (-1 … 1)
 
 	void printMyself();
 	void readConst(string no);
@@ -103,7 +110,16 @@ public:
 	double getXmin() const { return xmin; }
 	double getVmin() const { return vmin; }
 	double getVmax() const { return vmax; }
-	double getDx() const { return dx; }
+	double getDx() const { return dx; } // 均匀网格的格宽；非均匀网格时为最小格宽 (只用于 CFL 估计)
+	bool isNonuniform() const { return nonuniform; }
+	inline double Dx(int i) const { return h[xIdx(i)]; }  // 第 i 格宽度 (含幽灵格)
+	inline double XF(int i) const { return xf[xIdx(i)]; } // 第 i 格左侧网格面 (i = -nghosts … ni+nghosts)
+	int findCellX(double X) const // XF(i) <= X < XF(i+1) 的格号 (含幽灵格)
+	{
+		int k = int(std::upper_bound(xf.begin(), xf.end(), X) - xf.begin()) - 1 - nghosts;
+		return std::min(std::max(k, -nghosts), ni + nghosts - 1);
+	}
+	void setXFaces(const dvector &faces); // 非均匀 x 网格：faces 为真实格的 ni+1 个网格面，幽灵格按壁面镜像
 	double getDv() const { return dv; }
 	double getDt() const { return dt; }
 
@@ -198,6 +214,9 @@ protected:
 	static int num_ts;							   // number of time steps
 	dvector x;									   // x (i) pos
 	dvector v;									   // v (i)	vel
+	dvector xf;									   // x 网格面 (ni_total + 1)
+	dvector h;									   // x 格宽 (ni_total)
+	bool nonuniform = false;
 };
 
 #endif // !_WORLD_H
