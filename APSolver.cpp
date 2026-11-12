@@ -12,6 +12,7 @@ std::map<std::string, SolverType> stringToEnumMap = {
     {"DS", SolverType::DS},
     {"SOR", SolverType::SOR},
     {"SORAP", SolverType::SORAP},
+    {"Poisson", SolverType::Poisson},
     {"Thomas", SolverType::Thomas}};
 
 SolverType stringToEnum(const std::string &str)

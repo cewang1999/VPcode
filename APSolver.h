@@ -12,7 +12,8 @@ enum SolverType
     SORAP,
     Thomas,
     SOR,
-    DS
+    DS,
+    Poisson // 标准泊松 λ²φ'' = -ρ：与 AP 同一求解器 / 壁面离散，只去掉 AP 项 (Δt 取 0)
 };
 
 enum EFboundaryType
@@ -169,6 +170,7 @@ private:
     void assembleMatrix()
     {
         double lamda2 = lamda * lamda;
+        const double dt = apDt();
         double dx2 = dx * dx, dt2 = dt * dt;
         double alphal = 0., alphar = 0.;
         double grad2Nuu = 0., gradNu = 0., rh = 0., rhs = 0.;
@@ -216,6 +218,7 @@ private:
     // 幽灵 φ_g = gs φ_in + gn φ_next：kobra 为 (-2.5, 0.5)，central (WallMoment out) 为 (-1, 0)
     void assembleKobraWall(int i, double gs, double gn)
     {
+        const double dt = apDt();
         double lamda2 = lamda * lamda, dx2 = dx * dx, dt2 = dt * dt;
         int s = (i == 0) ? 0 : 1;
         int nx = (i == 0) ? 1 : ni - 2;
@@ -357,7 +360,7 @@ public:
 
         rho.resize(ni, nghosts);
 
-        if (type == AP || type == SORAP)
+        if (type == AP || type == SORAP || type == Poisson)
         {
             nu.resize(ni, nghosts);
             nuu.resize(ni, nghosts);
@@ -387,6 +390,7 @@ public:
         switch (type)
         {
         case AP:
+        case Poisson:
             return solverAP();
         case SOR:
             return solverSOR();
@@ -399,6 +403,7 @@ public:
 
     double getElectricField(int i) const { return Ef.val(i); }
     void setDt(double _dt) { dt = _dt; } // Scheme kobra: 自适应 dt
+    double apDt() const { return type == Poisson ? 0. : dt; } // AP 项所用的 Δt，标准泊松时为 0
     // 诊断用：电势与 AP 方程所用的矩 (i 可取 -1 与 ni)
     double getPhi(int i) const { return phi.val(i); }
     double getRho(int i) const { return rho.val(i); }
