@@ -1,0 +1,25 @@
+# Const number
+
+L           55
+n           3.2e19
+T           150
+sigma       10
+Nx          512
+Nv          1000
+theta       90
+SolverType  Poisson
+dt          0.0005
+num_ts      342800
+lambda      0.001
+WallFace    PFC3
+VCFL        0
+OutDiag     10
+OutF        8570
+WallE       onesided
+Umax        6
+XGrid       stretch
+DxWall      0.5
+WallWidth   50
+DxBulk      8
+Stretch     1.05
+OutProf     1714

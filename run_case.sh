@@ -1,6 +1,6 @@
 #!/bin/bash
 # 用法: ./run_case.sh <case编号> [线程数]
-# 在 runs/Case<编号>/ 下后台运行，输出 runtime_diags.csv、results/、log.txt
+# 在 runs/Case<编号>/ 下后台运行，输出 runtime_diags.csv、out/ (VPD)、log.txt
 set -e
 N=$1
 T=${2:-8}
@@ -10,7 +10,7 @@ if [ -z "$N" ]; then
 fi
 ROOT=$(cd "$(dirname "$0")" && pwd)
 D=$ROOT/runs/Case$N
-mkdir -p "$D/results" "$D/Grid" "$D/case"
+mkdir -p "$D/case"
 cp "$ROOT/case/Case$N.dat" "$D/case/"
 cp -r "$ROOT/input" "$D/"
 cd "$D"

@@ -49,10 +49,14 @@ namespace Const
 	int nRefine = 1;
 	int eFilter = 0;
 	double spikeDump = 0.;
+	int outProf = -1;
+	int outPrec = 8;
+	string caseNo;
 }
 
 void Const::readConst(string no)
 {
+	caseNo = no;
 	string filename = "./case/Case" + no + ".dat";
 	string line;
 	string comm;
@@ -130,8 +134,19 @@ void Const::readConst(string no)
 			record >> Const::eFilter;
 		else if (param == "SpikeDump")
 			record >> Const::spikeDump;
+		else if (param == "OutProf")
+			record >> Const::outProf;
+		else if (param == "OutPrec")
+			record >> Const::outPrec;
 		else
 			continue;
+	}
+	if (outProf < 0) // 缺省：剖面输出间隔为 OutF/10
+		outProf = (outF > 0) ? std::max(1, outF / 10) : 0;
+	if (outPrec != 4 && outPrec != 8)
+	{
+		cerr << "OutPrec 只能为 4 或 8" << endl;
+		exit(1);
 	}
 	sin_theta = sin(theta * PI / 180.);
 	V_Te = sqrt(T_elm * QE / ME);

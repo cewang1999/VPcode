@@ -13,29 +13,33 @@
 
 namespace OUTPUT
 {
-    /*output data of dvector type */
-    bool output(const dvector &f, const World &world, int step = 0);
-
-    /*output grid files about x and y*/
-    bool outputGrid(const World &world);
-
-    bool output(APSolver &solver, const World &world, int step = 0);
-
-    bool output(const Field &f, const World &world, int step = 0);
-
-    bool output(vector<Species> &species, const World &world_e, const World &world_i, int step = 0);
-
     /*屏幕输出函数*/
     void screenOutput(World &world, vector<Species> &species, APSolver &solver);
 
     /*输出诊断文件*/
     void diagOutput(World &world, vector<Species> &species, APSolver &solver);
 
-    //写电场文件
-    void writeEF(APSolver &solver,World &world);
+    // ---- 标准化二进制输出 (VPD 格式，格式说明见 plot/vpio.py) ----
+    // 文件 = 文本头 + 二进制数据：文本头逐行为
+    //   VPD 1 / meta <键> <值…> / fix <名> <类型> <维度…> / rec <名> <类型> <维度…> / end
+    // 其后依次为全部 fix 数组，再是若干条记录 (每条依次含全部 rec 数组)；C 序，类型 f8 / f4 / i8
+    // out/f_<ts>.vpd：一条记录，含 φ、E、ρ 与电子、离子分布函数 f[ix][iv]
+    // out/prof.vpd：每 OutProf 步追加一条记录，含 φ、E、ρ 与各粒子 n、u、T、q 剖面
+    // 在每步求解之后、输运之前调用：此时 f 为 f^n (t = ts·dt)，φ、E 由同一 f^n 求得
+    class VPDWriter
+    {
+    public:
+        VPDWriter(World &world, vector<Species> &species, APSolver &solver);
+        void step(int ts, double tTau); // tTau: 时间 (τi)
+        void writeSnapshot(int ts, double tTau);
+        void appendProfile(int ts, double tTau);
 
-    /*写分布函数到指定文件 (nj 行 × ni 列，同 results/vlasov_*.txt)*/
-    bool writeField(const string &name, const Field &f, const World &world);
+    private:
+        World &world;
+        vector<Species> &species;
+        APSolver &solver;
+        std::ofstream prof;
+    };
 
     // 电场能突跳诊断：每步求解后调用 check()。电场能超过上一步的 Const::spikeDump 倍时，
     // 保存触发步的 f^n 与前一步的 f^{n-1}（电子、离子），以及触发前后各 K 步的场剖面

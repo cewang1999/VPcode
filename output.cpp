@@ -3,155 +3,11 @@
 #include <iostream>
 #include <iomanip>
 #include <filesystem>
+#include <ctime>
+#include <cstdint>
 #include "output.h"
 
 using namespace std;
-
-bool OUTPUT::output(const Field &f, const World &world, int step)
-{
-
-    stringstream ss;
-    ss << "results/vlasov";
-    if (step >= 0)
-        ss << "_" << setw(6) << setfill('0') << step << ".txt"; // notice the '' not " " in setfill.
-    ofstream out(ss.str());
-
-    // check the file to be outputed
-    if (!out)
-    {
-        cerr << "CAN NOT GENERATE FILE!" << endl;
-        return false;
-    }
-
-    int ni = world.ni;
-    int nj = world.nj;
-
-    for (int j = 0; j < nj; j++)
-    {
-        for (int i = 0; i < ni; i++)
-        {
-            out << f(world.xIdx(i), world.vIdx(j));
-
-            if (i < ni - 1)
-            {
-                out << ",";
-            }
-        }
-        out << endl;
-    }
-
-    return true;
-}
-
-/*Output Grid (N,2), the first col is x, and the second col is y*/
-bool OUTPUT::outputGrid(const World &world)
-{
-    ofstream out("Grid/Grid.txt");
-
-    if (!out)
-    {
-        cerr << "CANNOT GENERATE GRID FILE !!!" << endl;
-        return false;
-    }
-
-    int ni = world.ni; // X方向格点数
-    int nj = world.nj; // Y方向格点数
-
-    // 第一行输出所有x
-    for (int i = 0; i < ni; i++)
-    {
-        out << world.X(i);
-        if (i < ni - 1)
-            out << ",";
-    }
-    out << endl;
-
-    // 第二行输出所有v
-    for (int i = 0; i < nj; i++)
-    {
-        out << world.V(i);
-        if (i < nj - 1)
-            out << ",";
-    }
-    out << endl;
-
-    out.close();
-    return true;
-}
-
-bool OUTPUT::output(const dvector &f, const World &world, int step)
-{
-    stringstream ss;
-    ss << "results/advection";
-    if (step >= 0)
-        ss << "_" << setw(6) << setfill('0') << step << ".txt"; // notice the '' not " " in setfill.
-    ofstream out(ss.str());
-
-    if (!out)
-    {
-        cerr << "Could not open output file !" << endl;
-        return false;
-    }
-    // out << "x,y\n"; // write header
-    for (int i = 0; i < f.size(); i++)
-    {
-        double x = world.X(i);
-        out << x << "," << f[i] << endl;
-    }
-    return true;
-}
-
-// bool OUTPUT::output(APSolver &solver, const World &world, int step)
-// {
-//     stringstream ss;
-//     ss << "Poisson/EF";
-//     if (step >= 0)
-//         ss << "_" << setw(6) << setfill('0') << step << ".txt"; // notice the '' not " " in setfill.
-//     ofstream out(ss.str());
-
-//     if (!out)
-//     {
-//         cerr << "Could not open output file !" << endl;
-//         return false;
-//     }
-
-//     dvector &f = solver.phi;
-
-//     // out << "x,y\n"; // write header
-//     for (int i = 0; i < f.size(); i++)
-//     {
-//         double x = world.X(i);
-//         out << x << "," << f[i] << endl;
-//     }
-//     return true;
-// }
-
-bool OUTPUT::output(vector<Species> &species, const World &world_e, const World &world_i, int step)
-{
-    stringstream ss;
-    ss << "dstri/ds";
-    if (step >= 0)
-        ss << "_" << setw(6) << setfill('0') << step << ".txt"; // notice the '' not " " in setfill.
-    ofstream out(ss.str());
-
-    if (!out)
-    {
-        cerr << "Could not open output file !" << endl;
-        return false;
-    }
-
-    Field &f_e = species[0].f;
-    Field &f_i = species[1].f;
-
-    // out << "x,y\n"; // write header
-    for (int i = 0; i < world_e.nj; i++)
-    {
-        double v_e = world_e.V(i);
-        double v_i = world_i.V(i);
-        out << v_e << "," << f_e[world_i.ni - 1][i] << "," << v_i << "," << f_i[world_i.ni - 1][i] << endl;
-    }
-    return true;
-}
 
 void OUTPUT::screenOutput(World &world, vector<Species> &species, APSolver &solver)
 {
@@ -214,7 +70,8 @@ void OUTPUT::diagOutput(World &world, vector<Species> &species, APSolver &solver
     if (world.getTs() % (10 * Const::outDiag) == 0)
         f_diag.flush();
 }
-bool OUTPUT::writeField(const string &name, const Field &f, const World &world)
+// SpikeDump 用：分布函数写为文本 (nj 行 × ni 列)
+static bool writeField(const string &name, const Field &f, const World &world)
 {
     ofstream out(name);
     if (!out)
@@ -299,4 +156,278 @@ void OUTPUT::SpikeDump::writeProfiles()
             out << r[k] << (k + 1 < r.size() ? "," : "\n");
     events++;
     post = -1;
+}
+
+// ======================= VPD 标准化输出 =======================
+namespace
+{
+#ifndef VP_GIT
+#define VP_GIT "unknown"
+#endif
+    struct VarSpec
+    {
+        string name, dtype;
+        vector<long> shape;
+        bool rec;
+    };
+
+    bool littleEndian()
+    {
+        const uint16_t one = 1;
+        return *reinterpret_cast<const uint8_t *>(&one) == 1;
+    }
+
+    string isoNow()
+    {
+        time_t now = time(nullptr);
+        char buf[32];
+        strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%S", localtime(&now));
+        return buf;
+    }
+
+    // 文件头：meta 为 (键, 值)；case 文件的参数以 param.<键> 写入
+    string vpdHeader(const string &kind, const vector<pair<string, string>> &meta, const vector<VarSpec> &vars)
+    {
+        ostringstream h;
+        h << setprecision(17);
+        h << "VPD 1\n";
+        h << "meta kind " << kind << "\n";
+        h << "meta endian " << (littleEndian() ? "little" : "big") << "\n";
+        h << "meta created " << isoNow() << "\n";
+        h << "meta git " << VP_GIT << "\n";
+        for (auto &m : meta)
+            h << "meta " << m.first << " " << m.second << "\n";
+        ifstream cf("./case/Case" + Const::caseNo + ".dat");
+        string line;
+        while (getline(cf, line))
+        {
+            istringstream rec(line);
+            string key, rest;
+            if (!(rec >> key) || key[0] == '#')
+                continue;
+            getline(rec, rest);
+            size_t a = rest.find_first_not_of(" \t"), b = rest.find_last_not_of(" \t\r");
+            h << "meta param." << key << " " << (a == string::npos ? "" : rest.substr(a, b - a + 1)) << "\n";
+        }
+        for (auto &v : vars)
+        {
+            h << (v.rec ? "rec " : "fix ") << v.name << " " << v.dtype;
+            for (long d : v.shape)
+                h << " " << d;
+            h << "\n";
+        }
+        h << "end\n";
+        return h.str();
+    }
+
+    template <typename T>
+    void putArr(ofstream &out, const T *p, size_t n) { out.write(reinterpret_cast<const char *>(p), n * sizeof(T)); }
+    void putF8(ofstream &out, const vector<double> &a) { putArr(out, a.data(), a.size()); }
+    void putI8(ofstream &out, long long v) { putArr(out, &v, 1); }
+    void putD(ofstream &out, double v) { putArr(out, &v, 1); }
+
+    string str(double v)
+    {
+        ostringstream s;
+        s << setprecision(17) << v;
+        return s.str();
+    }
+}
+
+OUTPUT::VPDWriter::VPDWriter(World &world, vector<Species> &species, APSolver &solver)
+    : world(world), species(species), solver(solver)
+{
+    if (Const::outF > 0 || Const::outProf > 0)
+        std::filesystem::create_directories("out");
+}
+
+void OUTPUT::VPDWriter::step(int ts, double tTau)
+{
+    if (Const::outProf > 0 && ts % Const::outProf == 0)
+        appendProfile(ts, tTau);
+    if (Const::outF > 0 && ts % Const::outF == 0)
+        writeSnapshot(ts, tTau);
+}
+
+// 与网格、粒子有关的公共 meta 与 fix 数组
+static vector<pair<string, string>> commonMeta(World &world, vector<Species> &species)
+{
+    vector<pair<string, string>> m = {
+        {"case", Const::caseNo},
+        {"nx", to_string(world.ni)},
+        {"nv", to_string(world.nj)},
+        {"dt", str(world.getDt())},
+        {"lambda", str(Const::lamda)},
+        {"tau_i_code", str(sqrt(Const::m_H))},
+        {"units", "x:L(域[-1,1]) v:v_Te t:tau_i(=sqrt(m_i/m_e)L/v_Te) phi:T/e E:T/(eL) f:n0/v_Te n:n0 u:v_Te T:T0 q:n0*T0*v_Te"},
+        {"layout", "C序; f[ix][iv]; x_face 为 nx+1 个网格面, x 为格中心, dx 为格宽; v_<sp> 为速度格中心 (均匀, 间距 dv_<sp>)"},
+        {"species", species.size() > 1 ? "e i" : "e"}};
+    for (size_t s = 0; s < species.size(); s++)
+    {
+        string sp = (s == 0) ? "e" : "i";
+        m.push_back({"mass_" + sp, str(species[s].mass)});
+        m.push_back({"charge_" + sp, str(species[s].charge)});
+        m.push_back({"dv_" + sp, str(species[s].getWorld().getDv())});
+        m.push_back({"name_" + sp, species[s].name});
+    }
+    return m;
+}
+
+static void commonFix(vector<VarSpec> &vars, World &world, vector<Species> &species)
+{
+    long nx = world.ni, nv = world.nj;
+    vars.push_back({"x_face", "f8", {nx + 1}, false});
+    vars.push_back({"x", "f8", {nx}, false});
+    vars.push_back({"dx", "f8", {nx}, false});
+    for (size_t s = 0; s < species.size(); s++)
+        vars.push_back({string("v_") + (s == 0 ? "e" : "i"), "f8", {nv}, false});
+}
+
+static void writeCommonFix(ofstream &out, World &world, vector<Species> &species)
+{
+    int nx = world.ni;
+    vector<double> a(nx + 1);
+    for (int i = 0; i <= nx; i++)
+        a[i] = world.XF(i);
+    putF8(out, a);
+    a.resize(nx);
+    for (int i = 0; i < nx; i++)
+        a[i] = world.X(i);
+    putF8(out, a);
+    for (int i = 0; i < nx; i++)
+        a[i] = world.Dx(i);
+    putF8(out, a);
+    for (Species &sp : species)
+    {
+        World &w = sp.getWorld();
+        vector<double> v(w.nj);
+        for (int j = 0; j < w.nj; j++)
+            v[j] = w.V(j);
+        putF8(out, v);
+    }
+}
+
+static void writeFieldProfiles(ofstream &out, int nx, APSolver &solver)
+{
+    vector<double> a(nx);
+    for (int i = 0; i < nx; i++)
+        a[i] = solver.getPhi(i);
+    putF8(out, a);
+    for (int i = 0; i < nx; i++)
+        a[i] = solver.getElectricField(i);
+    putF8(out, a);
+    for (int i = 0; i < nx; i++)
+        a[i] = solver.getRho(i);
+    putF8(out, a);
+}
+
+void OUTPUT::VPDWriter::writeSnapshot(int ts, double tTau)
+{
+    ostringstream fn;
+    fn << "out/f_" << setw(8) << setfill('0') << ts << ".vpd";
+    ofstream out(fn.str(), ios::binary);
+    if (!out)
+    {
+        cerr << "Could not open output file " << fn.str() << endl;
+        return;
+    }
+    long nx = world.ni, nv = world.nj;
+    string fdt = (Const::outPrec == 4) ? "f4" : "f8";
+    vector<VarSpec> vars;
+    commonFix(vars, world, species);
+    vars.push_back({"ts", "i8", {}, true});
+    vars.push_back({"t", "f8", {}, true});
+    for (const char *nm : {"phi", "E", "rho"})
+        vars.push_back({nm, "f8", {nx}, true});
+    for (size_t s = 0; s < species.size(); s++)
+        vars.push_back({string("f_") + (s == 0 ? "e" : "i"), fdt, {nx, nv}, true});
+    auto meta = commonMeta(world, species);
+    meta.push_back({"note", "f 为 f^n (t = ts*dt)；phi/E/rho 由同一 f^n 求得 (推进 f^n→f^{n+1} 所用的场)"});
+    out << vpdHeader("snapshot", meta, vars);
+    writeCommonFix(out, world, species);
+    putI8(out, ts);
+    putD(out, tTau);
+    writeFieldProfiles(out, nx, solver);
+    for (Species &sp : species)
+    {
+        World &w = sp.getWorld();
+        if (Const::outPrec == 4)
+        {
+            vector<float> row(w.nj);
+            for (int i = 0; i < w.ni; i++)
+            {
+                for (int j = 0; j < w.nj; j++)
+                    row[j] = (float)sp.F(i, j);
+                putArr(out, row.data(), row.size());
+            }
+        }
+        else
+        {
+            vector<double> row(w.nj);
+            for (int i = 0; i < w.ni; i++)
+            {
+                for (int j = 0; j < w.nj; j++)
+                    row[j] = sp.F(i, j);
+                putF8(out, row);
+            }
+        }
+    }
+}
+
+void OUTPUT::VPDWriter::appendProfile(int ts, double tTau)
+{
+    long nx = world.ni;
+    if (!prof.is_open())
+    {
+        prof.open("out/prof.vpd", ios::binary | ios::trunc);
+        if (!prof)
+        {
+            cerr << "Could not open out/prof.vpd" << endl;
+            return;
+        }
+        vector<VarSpec> vars;
+        commonFix(vars, world, species);
+        vars.push_back({"ts", "i8", {}, true});
+        vars.push_back({"t", "f8", {}, true});
+        for (const char *nm : {"phi", "E", "rho"})
+            vars.push_back({nm, "f8", {nx}, true});
+        for (size_t s = 0; s < species.size(); s++)
+            for (const char *q : {"n", "u", "T", "q"})
+                vars.push_back({string(q) + "_" + (s == 0 ? "e" : "i"), "f8", {nx}, true});
+        vars.push_back({"EE", "f8", {}, true});
+        auto meta = commonMeta(world, species);
+        meta.push_back({"note", "每条记录: f^n 的矩与由 f^n 求得的 phi/E/rho (t = ts*dt)；n=∫f dv, u=∫fv dv/n, T=m∫f(v-u)²dv/n, q=(m/2)∫f(v-u)³dv；EE=Σ E² dx"});
+        prof << vpdHeader("profile", meta, vars);
+        writeCommonFix(prof, world, species);
+    }
+    putI8(prof, ts);
+    putD(prof, tTau);
+    writeFieldProfiles(prof, nx, solver);
+    for (Species &sp : species)
+    {
+        World &w = sp.getWorld();
+        int nv = w.nj;
+        double dv = w.getDv(), m = sp.mass;
+        vector<double> n(nx), u(nx), T(nx), q(nx);
+#pragma omp parallel for schedule(static)
+        for (int i = 0; i < nx; i++)
+        {
+            double s0 = 0., s1 = 0.;
+            for (int j = 0; j < nv; j++)
+                s0 += sp.F(i, j), s1 += sp.F(i, j) * w.V(j);
+            s0 *= dv, s1 *= dv;
+            double ui = (s0 > 0.) ? s1 / s0 : 0., s2 = 0., s3 = 0.;
+            for (int j = 0; j < nv; j++)
+            {
+                double c = w.V(j) - ui;
+                s2 += sp.F(i, j) * c * c, s3 += sp.F(i, j) * c * c * c;
+            }
+            n[i] = s0, u[i] = ui;
+            T[i] = (s0 > 0.) ? m * s2 * dv / s0 : 0.;
+            q[i] = 0.5 * m * s3 * dv;
+        }
+        putF8(prof, n), putF8(prof, u), putF8(prof, T), putF8(prof, q);
+    }
+    putD(prof, solver.getElectricEnergy());
+    prof.flush(); // 每条记录落盘：算例中断时已写的记录完整可读
 }

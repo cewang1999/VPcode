@@ -67,6 +67,9 @@ namespace Const
 	extern double wallWidth;	  // stretch: 壁面等宽细网格区宽度 (λ)
 	extern double stretch;		  // stretch: 过渡区相邻格宽之比
 	extern int nRefine;			  // refine: 每侧壁面细分的粗格个数
+	extern int outProf;			  // 剖面 (φ, E, ρ, 各粒子 n/u/T/q) 输出间隔 (步), 写入 out/prof.vpd；缺省 OutF/10，0 表示不输出
+	extern int outPrec;			  // vpd 中分布函数的字节数: 8 (double) 或 4 (float)
+	extern std::string caseNo;	  // case 编号 (写入输出文件头)
 	std::vector<double> buildStretchedFaces(); // stretch 网格的网格面坐标 (-1 … 1)
 	std::vector<double> buildRefinedFaces();   // refine 网格: 均匀粗网格 (DxBulk)，每侧壁面 NRefine 个粗格各等分为 DxBulk/DxWall 个细格
 

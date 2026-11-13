@@ -126,6 +126,9 @@ int main(int argc, char *argv[])
     }
 
     OUTPUT::SpikeDump spike(world, species, solver);
+    OUTPUT::VPDWriter vpd(world, species, solver); // out/f_<ts>.vpd 与 out/prof.vpd
+    auto tauNow = [&]() // 当前时间 (τi)，同 runtime_diags.csv
+    { return ((Const::scheme == "kobra") ? world.getPhysicalTime() : world.getTs() * world.getDt()) / sqrt(Const::m_H); };
 
     ShiftX eShiftx(e), iShiftx(D);
     ShiftV eShiftv(e, solver), iShiftv(D, solver);
@@ -156,12 +159,11 @@ int main(int argc, char *argv[])
                 if (world.getTs() % (100 * Const::outDiag) == 0)
                     OUTPUT::screenOutput(world, species, solver);
                 OUTPUT::diagOutput(world, species, solver);
-                if (world.getTs() == 0)
-                    OUTPUT::outputGrid(world);
             }
 
             solver.solve();
             spike.check(world.getTs());
+            vpd.step(world.getTs(), tauNow());
 
             for (int half = 0; half < 2; ++half)
             {
@@ -176,8 +178,6 @@ int main(int argc, char *argv[])
                         s->setDt(dt), pfcFlux ? s->advection() : s->advectionKobra();
             }
 
-            if (Const::outF > 0 && world.getTs() % Const::outF == 0)
-                OUTPUT::output(e.f, world, world.getTs());
         }
         return 0;
     }
@@ -190,12 +190,11 @@ int main(int argc, char *argv[])
             if (world.getTs() % (100 * Const::outDiag) == 0)
                 OUTPUT::screenOutput(world, species, solver);
             OUTPUT::diagOutput(world, species, solver);
-            if (world.getTs() == 0)
-                OUTPUT::outputGrid(world);
         }
 
         solver.solve(); // 由 f^n 求 phi^{n+1}
         spike.check(world.getTs());
+        vpd.step(world.getTs(), tauNow()); // f^n 与由它求得的场
 
         // AP 格式要求先用 E^{n+1} 修正速度（电流），再做空间输运，见文献 (A.5)-(A.6)、(B.1)
         eShiftv.advection();
@@ -209,14 +208,6 @@ int main(int argc, char *argv[])
 
         // eShiftx.advection();
         // iShiftx.advection();
-
-        if (Const::outF > 0 && world.getTs() % Const::outF == 0)
-        {
-            // OUTPUT::output(D.f, world_D, world.getTs());
-            OUTPUT::output(e.f, world, world.getTs());
-            // OUTPUT::output(solver, world, world.getTs());
-            // OUTPUT::output(species, world, world_H, world.getTs());
-        }
     }
 
     return 0;
