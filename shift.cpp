@@ -53,13 +53,28 @@ namespace
             F[k] = (a >= 0) ? a * (q[k] + 0.5 * diff[k - 1] * (1. - c))
                             : a * (q[k + 1] - 0.5 * diff[k] * (1. + c));
     }
+
+    // 非均匀 x 的 kobraFaces：Courant 数 c = a dt / h_up，h_up 为迎风格 (q[k] 为格 k-1，q[k+1] 为格 k) 的物理宽度
+    void kobraFacesNU(const std::vector<double> &q, double a, double dt, const World &w, double tiny,
+                      std::vector<double> &diff, std::vector<double> &F)
+    {
+        int n = (int)q.size() - 2;
+        for (int k = 0; k < n; ++k)
+            diff[k] = kobraAv(q[k + 2] - q[k + 1], q[k + 1] - q[k], tiny);
+        for (int k = 1; k < n; ++k)
+            F[k] = (a >= 0) ? a * (q[k] + 0.5 * diff[k - 1] * (1. - a * dt / w.Dx(k - 1)))
+                            : a * (q[k + 1] - 0.5 * diff[k] * (1. + a * dt / w.Dx(k)));
+    }
 }
 
 void ShiftX::advectionKobra()
 {
     // 吸收壁 (kobra usrbd)：出射方向幽灵 = 贴壁格 (斜率为 0，面值 = 贴壁格值)；入射方向幽灵 = 2 fFloor - 贴壁格 (面值 = fFloor)
+    // 非均匀 x：斜率仍取相邻格之差 (逻辑坐标下的线性重构，同 kobra-nu 的映射做法)，
+    // Hancock 修正的 Courant 数用迎风格的物理宽度，更新除以本格宽度
     int _ni = world.ni, _nj = world.nj;
     double dx = world.getDx(), dv = world.getDv();
+    const bool nu = world.isNonuniform();
     double fl = sp.fFloor, tiny = kobraTiny(sp);
     double neg = 0., small = 0.;
 #pragma omp parallel for schedule(static)
@@ -71,7 +86,10 @@ void ShiftX::advectionKobra()
             q[i + 1] = sp.F(i, j);
         q[0] = (v < 0) ? q[1] : 2. * fl - q[1];
         q[_ni + 1] = (v > 0) ? q[_ni] : 2. * fl - q[_ni];
-        kobraFaces(q, v, v * dt / dx, tiny, diff, F);
+        if (nu)
+            kobraFacesNU(q, v, dt, world, tiny, diff, F);
+        else
+            kobraFaces(q, v, v * dt / dx, tiny, diff, F);
         F[0] = v * ((v < 0) ? q[1] - 0.5 * diff[0] : fl);
         F[_ni] = v * ((v > 0) ? q[_ni] + 0.5 * diff[_ni - 1] : fl);
         for (int i = 0; i <= _ni; ++i)
@@ -82,10 +100,11 @@ void ShiftX::advectionKobra()
     for (int j = 0; j < _nj; ++j)
         for (int i = 0; i < _ni; ++i)
         {
-            double val = sp.F(i, j) - dt * (flux[i + 1][j] - flux[i][j]) / dx;
+            double hx = nu ? world.Dx(i) : dx;
+            double val = sp.F(i, j) - dt * (flux[i + 1][j] - flux[i][j]) / hx;
             if (val < fl)
             {
-                (val < 0. ? neg : small) += (fl - val) * dx * dv; // 记录被抬到下限所加的质量
+                (val < 0. ? neg : small) += (fl - val) * hx * dv; // 记录被抬到下限所加的质量
                 val = fl;
             }
             sp.F(i, j) = val;
@@ -133,12 +152,13 @@ void ShiftV::advectionKobra()
 {
     // FREE 边界 (kobra usrbd 缺省 pl = pr)：幽灵 = 边缘格，两端面值 = 边缘格的重构值 (可流入)
     int _ni = world.ni, _nj = world.nj;
-    double dx = world.getDx(), dv = world.getDv();
+    double dv = world.getDv();
     double fl = sp.fFloor, tiny = kobraTiny(sp);
     double neg = 0., small = 0.;
 #pragma omp parallel for schedule(static) reduction(+ : neg, small)
     for (int i = 0; i < _ni; ++i)
     {
+        double dx = world.Dx(i); // 只用于记录被抬到下限的质量
         double a = sp.charge * getElectricField(i) / sp.mass;
         std::vector<double> q(_nj + 2), diff(_nj), F(_nj + 1);
         for (int j = 0; j < _nj; ++j)

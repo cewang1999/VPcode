@@ -140,6 +140,27 @@ def moments(f, v, mass, axis=-1):
     return n, u, T, q
 
 
+def faces_from_case(case, x=None):
+    """由 case 参数重建 x 网格面 (旧格式没有存格面)：uniform、refine 与 C++ 相同；其他情况由格中心反推。"""
+    grid = case.get("XGrid", "uniform")
+    lam = case.get("lambda", 1e-3)
+    if grid == "uniform" and "Nx" in case:
+        return np.linspace(-1.0, 1.0, int(case["Nx"]) + 1)
+    if grid == "refine":
+        nc = int(round(2.0 / (case.get("DxBulk", 16) * lam)))
+        r = int(round(case.get("DxBulk", 16) / case.get("DxWall", 0.5)))
+        nref = int(case.get("NRefine", 1))
+        H, faces = 2.0 / nc, []
+        for k in range(nc):
+            sub = r if (k < nref or k >= nc - nref) else 1
+            faces += [-1.0 + k * H + H * m / sub for m in range(sub)]
+        return np.array(faces + [1.0])
+    xf = [-1.0]
+    for xc in x:
+        xf.append(2 * xc - xf[-1])
+    return np.array(xf)
+
+
 def read_case(path):
     """读取 case/CaseN.dat 为 dict。"""
     d = {}
@@ -226,11 +247,14 @@ class Run:
         dict.__init__(s)
         s.path, s.version, s.nrec, s.param = fn, 0, 1, self.case
         s.meta = {"kind": "legacy", "nx": len(x), "nv": len(v), "dt": self.case.get("dt")}
-        s["x"], s["v_e"] = x, v
+        xf = faces_from_case(self.case, x)
+        if len(xf) != len(x) + 1 or np.abs(0.5 * (xf[1:] + xf[:-1]) - x).max() > 1e-5:
+            xf = faces_from_case({}, x)  # case 参数与 Grid.txt 不符时由格中心反推
+        s["x"], s["x_face"], s["dx"], s["v_e"] = 0.5 * (xf[1:] + xf[:-1]), xf, np.diff(xf), v
         s["ts"] = self._ts(fn) + 1
         s["t"] = s["ts"] * self.case["dt"] / np.sqrt(self.MASS_RATIO)
         s["f_e"] = np.loadtxt(fn, delimiter=",").T  # 文件为 nv 行 × nx 列 (6 位有效数字)
-        s.fields = ["x", "v_e", "ts", "t", "f_e"]
+        s.fields = ["x", "x_face", "dx", "v_e", "ts", "t", "f_e"]
         return s
 
     def summary(self):

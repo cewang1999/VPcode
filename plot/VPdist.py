@@ -6,6 +6,7 @@
   slice RUN... --t 0.5 --d 0.25,10,100       给定离壁距离处的 f(v)；--maxw 叠加同 n、u、T 的麦克斯韦分布
   vt    RUN    --d 0.25 --sp e               给定离壁距离处 f(v) 随时间的演化 (速度 × 时间图)
   diff  RUN RUN0 --t 0.5 --sp e              两个算例同一时刻 f 之差 (同一网格)
+  wall  TEST REF --d 0.25 --sp e [--t ...]   离壁 d 处 f(v) 逐时刻对比 (上: f，下: 差)；REF 按 TEST 的格做格宽加权平均，可比不同网格
 通用选项:
   --side avg|left|right|full  缺省 avg (两壁对折平均)；对折时 v 取指向壁面为正
   --dmax 离壁距离上限 (λ)，--logd 距离对数轴，--lin 线性色标 (缺省对数)，--floor 对数色标下限 (相对最大值, 缺省 1e-6)
@@ -347,9 +348,73 @@ def cmd_diff(args):
     save(fig, args, os.path.join(run.path, f"dist_diff_{rname(ref)}.png"))
 
 
+def cell_avg(X, F, a, b):
+    """折叠坐标下 [a, b] 区间内各格 f 的格宽加权平均 (把 REF 限制到 TEST 的格上)。"""
+    lo, hi = np.maximum(X[:-1], a), np.minimum(X[1:], b)
+    w = np.clip(hi - lo, 0.0, None)
+    return (w[:, None] * F).sum(axis=0) / w.sum()
+
+
+def cmd_wall(args):
+    """TEST 与 REF 在给定离壁距离处 f(v) 的逐时刻对比；REF 按 TEST 的格做格宽加权平均。"""
+    if len(args.runs) != 2:
+        sys.exit("wall 需要两个算例: TEST REF")
+    run, ref = Run(args.runs[0]), Run(args.runs[1])
+    sp = args.sp.split(",")[0]
+    d = float((args.d or "0.25").split(",")[0])
+    side = args.side if args.side != "full" else "avg"
+    ks = pick_times(run, args.t or "0.2,0.4,1,2,3,4")
+    ncol = min(3, len(ks))
+    nrow = (len(ks) + ncol - 1) // ncol
+    fig = plt.figure(figsize=(3.9 * ncol, 3.9 * nrow), constrained_layout=True)
+    gs = fig.add_gridspec(2 * nrow, ncol, height_ratios=[3, 1.3] * nrow)
+    cT, cR = CAT[0], CAT[1]
+    for n, k in enumerate(ks):
+        r, c = divmod(n, ncol)
+        s = run.snap(k)
+        t = float(s["t"])
+        k0 = int(np.argmin(np.abs(ref.snap_t - t)))
+        s0 = ref.snap(k0)
+        X, v, _, F, xlab, vlab = phase(run, s, sp, side)
+        X0, v0, _, F0, _, _ = phase(ref, s0, sp, side)
+        if len(v) != len(v0):
+            sys.exit(f"速度网格不同: {len(v)} vs {len(v0)}")
+        i = int(np.argmin(np.abs(0.5 * (X[1:] + X[:-1]) - d)))
+        a, b = X[i], X[i + 1]
+        fT, fR = F[i], cell_avg(X0, F0, a, b)
+        mT, mR = moments(fT, v, 1.0), moments(fR, v, 1.0)
+        ax = fig.add_subplot(gs[2 * r, c])
+        ax.plot(v, fR, color=cR, lw=1.8, label=f"{rname(ref)} (avg over cell)")
+        ax.plot(v, fT, color=cT, lw=1.1, ls=(0, (4, 2)), label=rname(run))
+        fmax = max(fT.max(), fR.max())
+        hit = np.abs(v[(fR > args.floor * fmax) | (fT > args.floor * fmax)])
+        vl = args.vlim or 1.15 * hit.max()
+        ax.set_xlim(-vl, vl)
+        if not args.lin:
+            ax.set_yscale("log")
+            ax.set_ylim(args.floor * fmax, 2 * fmax)
+        dn = (mT[0] / mR[0] - 1) * 100
+        dT = (mT[2] / mR[2] - 1) * 100
+        ax.set_title(f"t = {t:.3g} τi   Δn {dn:+.2f}%  ΔT {dT:+.2f}%", fontsize=9)
+        if c == 0:
+            ax.set_ylabel(f"f_{sp}")
+        if n == 0:
+            ax.legend(fontsize=7, loc="lower center")
+        ax.tick_params(labelbottom=False)
+        bx = fig.add_subplot(gs[2 * r + 1, c], sharex=ax)
+        bx.axhline(0, color=GRAY, lw=0.6)
+        bx.plot(v, (fT - fR) / fR.max() * 100, color=cT, lw=1.0)
+        bx.set_xlabel(vlab)
+        if c == 0:
+            bx.set_ylabel("Δf / max f_REF [%]")
+    fig.suptitle(f"f_{sp} at {d:g} λ from wall (cell {a:.3g}–{b:.3g} λ, side={side}): "
+                 f"{rname(run)} vs {rname(ref)}", fontsize=10)
+    save(fig, args, os.path.join(run.path, f"dist_wall_{sp}_{rname(ref)}.png"))
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("cmd", choices=["panel", "anim", "slice", "vt", "diff"])
+    ap.add_argument("cmd", choices=["panel", "anim", "slice", "vt", "diff", "wall"])
     ap.add_argument("runs", nargs="+")
     ap.add_argument("--t", help="时刻 (τi)，逗号分隔")
     ap.add_argument("--sp", default="e,i", help="粒子: e、i 或 e,i")
@@ -367,7 +432,7 @@ def main():
     ap.add_argument("--dpi", type=int, default=150)
     ap.add_argument("--show", action="store_true")
     args = ap.parse_args()
-    {"panel": cmd_panel, "anim": cmd_anim, "slice": cmd_slice, "vt": cmd_vt, "diff": cmd_diff}[args.cmd](args)
+    {"panel": cmd_panel, "anim": cmd_anim, "slice": cmd_slice, "vt": cmd_vt, "diff": cmd_diff, "wall": cmd_wall}[args.cmd](args)
 
 
 if __name__ == "__main__":

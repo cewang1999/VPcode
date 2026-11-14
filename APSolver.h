@@ -265,6 +265,59 @@ private:
         d[i] = -dx2 * rhsw;
     }
 
+    // 非均匀 x 的 kobra 壁面行 (assembleKobraWall 的有限体积形式，整行乘以贴壁格宽 h0)：
+    //   [α_in (φ_next-φ_w)/d - a_w (φ_w-φ_g)/h0] / h0 = -[ρ_w - Δt (J_in - J_w)/h0 + Δt² (∂R_in - ∂R_w)/h0]
+    // 内侧面：α、J 按格宽插值，∂R_in = (R_next - R_w)/d，d 为两格中心距；壁面 ∂R 的单侧估计除以 h0；
+    // 幽灵 φ_g = gs φ_w + gn φ_next 保持原式 (按贴壁格宽，refine / stretch 的壁面两格等宽或近似等宽)。均匀网格时为 assembleKobraWall / dx
+    void assembleKobraWallNU(int i, double gs, double gn)
+    {
+        const World &w = species[0].getWorld();
+        const double dt = apDt();
+        double lamda2 = lamda * lamda, dt2 = dt * dt;
+        int s = (i == 0) ? 0 : 1;
+        int nx = (i == 0) ? 1 : ni - 2;
+        double h0 = w.Dx(i), h1 = w.Dx(nx), dd = fabs(w.X(nx) - w.X(i));
+        double jw = 0., kw = 0., rw = 0.;
+        for (auto &sp : species)
+        {
+            World &ws = sp.getWorld();
+            double dvv = ws.getDv();
+            for (int j = 0; j < ws.nj; ++j)
+            {
+                double v = ws.V(j);
+                bool out = (s == 0) ? (v < 0) : (v > 0);
+                double f0 = sp.F(i, j), f1 = sp.F(nx, j);
+                if (out)
+                {
+                    jw += sp.charge * f0 * v * dvv;
+                    rw += f0 / sp.mass * dvv;
+                }
+                else
+                    kw += sp.charge * 0.5 * (7. * f0 - f1) * v * v * dvv / h0 * ((s == 0) ? 1. : -1.);
+            }
+        }
+        double aw = lamda2 + dt2 * rw;
+        double jin = (h1 * nu.val(i) + h0 * nu.val(nx)) / (h0 + h1);
+        double kin = (nuu.val(nx) - nuu.val(i)) / dd;
+        double ain = lamda2 + dt2 * (h1 * ntol.val(i) + h0 * ntol.val(nx)) / (h0 + h1);
+        double rhsw;
+        if (s == 0)
+        {
+            a[i] = 0.;
+            b[i] = -ain / dd + (gs - 1.) * aw / h0;
+            c[i] = ain / dd + gn * aw / h0;
+            rhsw = rho.val(i) - dt * (jin - jw) / h0 + dt2 * (kin - kw) / h0;
+        }
+        else
+        {
+            c[i] = 0.;
+            b[i] = -ain / dd + (gs - 1.) * aw / h0;
+            a[i] = ain / dd + gn * aw / h0;
+            rhsw = rho.val(i) - dt * (jw - jin) / h0 + dt2 * (kw + kin) / h0;
+        }
+        d[i] = -h0 * rhsw;
+    }
+
     // 非均匀 x 网格的有限体积组装 (h_i 为格宽，d± 为相邻格中心距)：
     //   α_{i+½}(φ_{i+1}-φ_i)/d+ - α_{i-½}(φ_i-φ_{i-1})/d- = -h_i ρ_i + Δt (J_{i+½} - J_{i-½}) - Δt² (∂R_{i+½} - ∂R_{i-½})
     // 面值 (n/m、J) 按格宽线性插值，∂R 为两格中心差分；均匀网格时乘以 dx 即 assembleMatrix
@@ -295,6 +348,8 @@ private:
             c[i] = alphar / dp;
             b[i] = -(a[i] + c[i]);
             d[i] = -w.Dx(i) * rho.val(i) + dt * jdiv - dt2 * rdiv;
+            if ((kobraWall || wallMomentOut) && (i == 0 || i == ni - 1))
+                assembleKobraWallNU(i, kobraWall ? -2.5 : -1., kobraWall ? 0.5 : 0.);
             if (i == 0)
             {
                 b[i] += (bc[0] == EF_DIRI ? -1. : 1.) * a[i];
@@ -347,6 +402,12 @@ private:
             {
                 Ef.val(0) = -(phi.val(1) - phi.val(0)) / (w.X(1) - w.X(0));
                 Ef.val(ni - 1) = -(phi.val(ni - 1) - phi.val(ni - 2)) / (w.X(ni - 1) - w.X(ni - 2));
+            }
+            if (kobraWall)
+            {
+                // 同 kobra 的 cal_field (幽灵 φ_g = -2.5 φ0 + 0.5 φ1)，用贴壁格宽
+                Ef.val(0) = -(phi.val(1) + 5. * phi.val(0)) / (4. * w.Dx(0));
+                Ef.val(ni - 1) = (5. * phi.val(ni - 1) + phi.val(ni - 2)) / (4. * w.Dx(ni - 1));
             }
             return;
         }
@@ -417,9 +478,9 @@ public:
         kobraWall = (Const::wallE == "kobra");
         wallMomentOut = (Const::wallMoment == "out") && (Const::wallE == "central");
         nonuni = e.getWorld().isNonuniform();
-        if (nonuni && (kobraWall || wallMomentOut || Const::eFilter > 0 || !(type == AP || type == Poisson)))
+        if (nonuni && (Const::eFilter > 0 || !(type == AP || type == Poisson)))
         {
-            cerr << "XGrid stretch 只支持 SolverType AP / Poisson，WallE central / onesided，WallMoment avg，EFilter 0" << endl;
+            cerr << "XGrid stretch / refine 只支持 SolverType AP / Poisson，EFilter 0" << endl;
             exit(1);
         }
         ni = e.getWorld().ni, nj = e.getWorld().nj;

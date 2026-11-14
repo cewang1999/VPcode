@@ -124,6 +124,13 @@ Case63 结果：每侧只细分 1 个粗格（细网格 8λ，16 倍格宽突变
 | 80 | 1e-3 | refine → 280, Nv = 1000 | 0.0005 | 342800 | 同 Case63（refine + AP），`WallE onesided`：Case78 的 AP 对照（onesided 本身对结果的影响），`OutProf 1714`，约 21 min |
 | 81 | 1e-3 | stretch → 512, Nv = 1000 | 0.0005 | 342800 | 同 Case59（壁面 50λ 内 0.5λ，等比 1.05 过渡到 8λ），`SolverType Poisson` + `WallE onesided`：粗细之间无突变时普通泊松是否稳定（对照 Case78 的 16 倍突变），`OutProf 1714`，约 1 h |
 | 82 | 1e-3 | 250（均匀 8λ）, Nv = 1000 | 0.0005 | 342800 | 同 Case79，`SolverType AP`：全粗网格上 AP 与普通泊松的精度对照，约 19 min |
+| 83 | 1e-3 | 4000, Nv = 1000 | 0.0005 | 342800 | 同 Case50（标杆），新输出：`OutF 17140`（每 0.2 τi 一个 f 快照，共 21 个，电子 + 离子，`OutPrec 4`，每个约 32 MB，共约 0.7 GB）、`OutProf 1714`（剖面每 0.02 τi），用于与 Case84 逐格对比 |
+| 84 | 1e-3 | refine → 280, Nv = 1000 | 0.0005 | 342800 | 同 Case63，输出同 Case83；`python plot/VPcmp.py runs/Case84 runs/Case83` |
+| 85 | 1e-3 | refine → 376, Nv = 1000 | 0.0005 | 342800 | 同 Case84，`DxWall 0.125`（壁面粗格等分为 64 个 0.125λ 细格，细格 x-CFL = 24）：Case83/84 在 t ≳ 1.8 τi 时 λ_D,wall/Δx 降到 0.36–0.4，贴壁格 φ₀ 高于体区（4 τi 时高 0.24 T_e）、第 2 格 ρ < 0，检验这一非单调电势是否为鞘层欠分辨；与 Case84 对比，约 45 min |
+| 86 | 1e-3 | 4000, Nv = 1000 | 自适应 | 0–2 τi | `Scheme kobra` + `WallE kobra` + `Umax 6`（与 kobra 相同的离散：MUSCL-Hancock + Strang + 自适应 dt）在均匀 0.5λ 上：Case87 的参照；输出同 Case83（按物理时间每 0.02 τi 剖面、0.2 τi 快照），约 20 h（可随时停，已写的记录完整） |
+| 87 | 1e-3 | refine → 280, Nv = 1000 | 自适应 | 0–4 τi | 同 Case86，`XGrid refine`（Case63 的网格：8λ 粗网格 + 壁面 16 个 0.5λ 细格）：kobra 格式在非均匀网格上的验证（kobra 移植的可行性），约 3 h；`VPcmp.py runs/Case87 runs/Case86` |
+| 88 | 1e-3 | 250（均匀 8λ）, Nv = 1000 | 自适应 | 0–4 τi | 同 Case86，均匀 8λ：Case87 的体区网格，看壁面细网格块的作用，约 10 min |
+| 89 | 1e-3 | 1000（均匀 2λ）, Nv = 1000 | 自适应 | 0–4 τi | 同 Case43（kobra 1000×1000 的同离散），新输出：kobra 实际所用分辨率的对照，约 3 h |
 
 Case67–69 结果（以 Case50 为基准）：
 - Case67（Δt = 0.001）与均匀网格 Case52 逐时刻几乎相同（壁面 Te 低 2–5%，通量 < 0.1%）。
@@ -144,6 +151,11 @@ Case67–69 结果（以 Case50 为基准）：
   与 Case63 比，壁面粒子流 / 离子能流 < 0.05%，电子能流 < 0.5%，壁面 Te 0.5 / 1 / 1.5 τi 时 +5.5% / +3.6% / −2.2%。
   电场能只有 Case63 的 2–20%（8λ 贴壁格内鞘层不分辨，onesided 下鞘层电场不作用在贴壁格上）。
   对比 Case78（refine + onesided 失败）：失稳与粗细格 16 倍突变处的普通泊松离散有关，而非粗格本身；Case81 检验平滑过渡时是否稳定
+- Case63 对 Case50 逐格对比（旧 txt 数据，仅电子，`plot/VPcmp.py`）：壁面通量 / 能流 0.5 τi 后 < 0.1%；f_e 的 L1 误差 ≤ 1.4%（1–3 τi 约 0.1–0.2%）；
+  0.25–0.5 τi 贴壁 T_e 约 1%（初始瞬态）；3.6 τi 前各区 n_e、u_e < 0.4%、T_e < 0.7%。4 τi 时体区 T_e 偏差跳到 3.4%（约 220λ），并出现 ±0.1–0.3% 的相邻格交替。
+  此时参考解自身未收敛：体区 σ/Δv 降到 1.64（低于 Nv 判据中 Te 误差约 4% 的 1.7），Case50 的 0.5λ 解在一个 8λ 粗格内出现 2% 的 T 起伏、
+  n 中 < 16λ 尺度的起伏由 3.6 τi 的 0.016% 增到 0.094%，粗格无法表示这种格内结构。故后期偏差属速度分辨率不足，量级小于 Nv（Case46）与 Δt（Case52，−5%）
+  对 Te 的影响；q 的相对偏差在 q ≈ 0 的体区无意义。待 Case72（refine，Nv 2000）确认加密 v 后该偏差是否消失
 
 Nv 的经验判据（Case46 Nv = 256 对 Case50 Nv = 1000，同 Nx = 4000、Δt）：σ/Δv（σ = √T_wall 为壁面速度宽度，Δv = 2·Umax/Nv）
 降到约 1.5 时离子 T 误差约 1%、降到约 0.75 时约 5%；电子 Te 对此更敏感，σ/Δv ≈ 3.6 / 1.7 / 1.05 时误差约 1% / 4% / 10%。
@@ -163,7 +175,9 @@ Case46–48 的 Δt 统一取 0.0005（x-CFL = 1.5 / 6 / 12）：Nx = 4000 时 �
 ## case 文件可选参数（缺省值）
 - `SolverType`（必填）：`AP`（渐近保持重构泊松）或 `Poisson`（标准泊松 λ²φ'' = -ρ：同一 Thomas 求解器、壁面离散与电场计算，只去掉 Δt²n/m、Δt∂J、Δt²∂²R 项；显式格式要求 ω_pe Δt < 2 且 Δx ≲ λ）。旧的 `SOR` / `SORAP` / `DS` / `Thomas` 未维护，不要使用
 - `lambda`（1e-3）：λ_D / L_par
-- `XGrid`（uniform）：`uniform` 为 Nx 等分；`stretch` 为非均匀 x 网格（壁面细、体区粗，Nx 由下列参数算出，case 中的 Nx 不用）。x 输运为非均匀网格上的守恒半拉格朗日 PFC3（全局 Δt，可跨越多格），AP / 泊松方程为非均匀有限体积；只支持 Scheme PFC3、SolverType AP / Poisson、WallE central / onesided、WallMoment avg、EFilter 0
+- `XGrid`（uniform）：`uniform` 为 Nx 等分；`stretch` 为非均匀 x 网格（壁面细、体区粗，Nx 由下列参数算出，case 中的 Nx 不用）。x 输运为非均匀网格上的守恒半拉格朗日 PFC3（全局 Δt，可跨越多格），AP / 泊松方程为非均匀有限体积；支持 SolverType AP / Poisson、EFilter 0；Scheme PFC3 与 Scheme kobra 均可。
+  Scheme kobra 下 x 输运为 MUSCL-Hancock：斜率仍取相邻格之差（逻辑坐标下的线性重构，与 kobra-nu 分支的映射做法相同），Hancock 修正的 Courant 数用迎风格物理宽度，更新除以本格宽度；
+  自适应 dt 按每格 |v|/h_i；WallE kobra / WallMoment out 的壁面行为非均匀有限体积形式（内侧面系数、电流按格宽插值，∂R 除以两格中心距，幽灵 φ_g 与壁面 ∂R 估计用贴壁格宽），E₀ 用贴壁格宽
 - `DxWall`（0.5）、`WallWidth`（50）、`DxBulk`（16）：stretch 网格的壁面格宽、壁面等宽区宽度、体区格宽，单位 λ
 - `Stretch`（1.05）：stretch 网格过渡区相邻格宽之比
 - `XGrid refine`：均匀粗网格（格宽 `DxBulk` λ，要求 2/(DxBulk·λ) 为整数），每侧壁面最近的 `NRefine`（1）个粗格各等分为 DxBulk/DxWall（须为整数）个细格，细格面与粗格面重合、无过渡区；Nx = Nc + 2·NRefine·(r − 1)。`NRefine 0` 与均匀网格逐位相同。数值方法与 stretch 相同
@@ -171,7 +185,8 @@ Case46–48 的 Δt 统一取 0.0005（x-CFL = 1.5 / 6 / 12）：Nx = 4000 时 �
 - `VCFL`（0）：v 方向子循环的 CFL 上限，0 为不子循环
 - `OutDiag`（10）：`runtime_diags.csv` 输出间隔（步）
 - `OutF`（100）：分布函数快照输出间隔（步），0 为不输出
-- `OutProf`（OutF/10）：剖面 `out/prof.vpd` 输出间隔（步），0 为不输出
+- `OutProf`（OutF/10）：剖面 `out/prof.vpd` 输出间隔（步），0 为不输出。`Scheme kobra`（自适应 dt）下按物理时间输出：每 OutProf·dt（case 中的 dt）一次，dt 截短使步恰好落在输出时刻，
+  文件编号为名义步数 t/dt，因而不同网格的 kobra 格式算例与固定 Δt 算例输出时刻相同
 - `OutPrec`（8）：vpd 快照中 f 的字节数，8（double）或 4（float，文件减半）
 - `EFilter`（0）：内部电场 (1,2,1)/4 二项式滤波次数，贴壁 2 格不滤
 - `SpikeDump`（0）：电场能突跳诊断。某步电场能超过上一步的 `SpikeDump` 倍时，在 `spike/ev<k>_` 下保存触发步的 fⁿ 与前一步 f^{n-1}（`fe_now/fe_prev/fi_now/fi_prev.txt`，文本，nv 行 × nx 列），以及触发前后各 20 步的场剖面 `prof.csv`（φ, E, ρ, J, R, Σf/m，含 i = −1 与 Nx 两个幽灵点）；最多 5 次
@@ -210,6 +225,11 @@ Case46–48 的 Δt 统一取 0.0005（x-CFL = 1.5 / 6 / 12）：Nx = 4000 时 �
   - `... VPdist.py slice runs/Case79 runs/Case63 --t 0.4,1.2 --d 0.5,20,200 --sp e --maxw`：给定离壁距离的 f(v)，`--maxw` 叠加同 n、u、T 的麦克斯韦分布
   - `... VPdist.py vt runs/Case78 --d 12 --sp e`：给定离壁距离处 f(v) 随时间的演化（时间分辨率为 OutF）
   - `... VPdist.py diff runs/Case78 runs/Case80 --t 0.6 --dmax 100`：两个算例同一时刻 f 之差（同一网格）
+  - `... VPdist.py wall runs/Case84 runs/Case83 --d 0.25 --sp e --t 0.2,0.4,1,2,3,4`：离壁 d 处 f(v) 逐时刻对比（上：f，下：Δf / max f_REF）；REF 按 TEST 的格做格宽加权平均，可比不同网格；标题给出该格 Δn、ΔT
+- 逐格对比（`plot/VPcmp.py TEST REF`）：把 REF（细网格）守恒地限制到 TEST 的格上（n、ρ、φ、E、f 按格宽平均，u、T、q 由限制后的 ∫f v^k dv 重组，
+  等同于先对 REF 的 f 做格平均再求矩），逐格比较剖面与 f，并比较壁面量。要求 TEST 的格面都是 REF 的格面、速度网格相同。
+  输出在 TEST 目录下 `cmp_<REF>_summary.txt`（分区域最大偏差表）、`_prof.png`、`_err_t.png`、`_f.png`、`_fL1.png`、`_diag.png`。
+  例：`~/plotenv/bin/python plot/VPcmp.py runs/Case84 runs/Case83 --t 0.5,1,2,4`
 - 图默认存在第一个算例目录下，`--out` 指定文件名，`--side left|right|full` 只看一侧或全域；`python plot/VPplot.py -h` 看全部选项
 - `~/plotenv/bin/python plot/PaperFigs.py runs/Case4 [runs/Case12 ...]`：按文献坐标轴画图 1、图 7 和 Γe/Γi − 1，图存在运行目录（多个目录时存在 runs/）
 

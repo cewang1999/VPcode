@@ -24,13 +24,15 @@ static double kobraRate(vector<Species> &species, const APSolver &solver, bool f
     {
         World &w = sp.getWorld();
         double dx = w.getDx(), dv = w.getDv(), th = 1.001 * sp.fFloor;
+        const bool nu = w.isNonuniform();
 #pragma omp parallel for schedule(static) reduction(max : rate)
         for (int i = 0; i < w.ni; ++i)
         {
             double a = first ? 0. : fabs(sp.charge * solver.getElectricField(i) / sp.mass) / dv;
+            double dxi = nu ? w.Dx(i) : dx; // 非均匀 x：本格物理宽度
             for (int j = 0; j < w.nj; ++j)
                 if (first || sp.F(i, j) > th)
-                    rate = std::max(rate, std::max(fabs(w.V(j)) / dx, a));
+                    rate = std::max(rate, std::max(fabs(w.V(j)) / dxi, a));
         }
     }
     return rate;
@@ -55,11 +57,6 @@ int main(int argc, char *argv[])
     dvector xfaces;
     if (stretchX)
     {
-        if (Const::scheme == "kobra")
-        {
-            cerr << "XGrid " << Const::xgrid << " 不支持 Scheme kobra" << endl;
-            return 1;
-        }
         xfaces = refineX ? Const::buildRefinedFaces() : Const::buildStretchedFaces();
         Nx = (int)xfaces.size() - 1;
     }
@@ -139,10 +136,25 @@ int main(int argc, char *argv[])
         // 再 x 半步 → v 整步 (E = -∇φ) → x 半步 (Strang)。算到 t_end = dt(case) × num_ts
         const bool pfcFlux = (Const::flux == "PFC3"); // 只换输运格式, 时间推进仍同 kobra
         double tEnd = world.getDt() * world.getNumTs();
+        // VPD 按物理时间输出：每 Tp = OutProf·dt(case) 一次 (OutProf 为 0 时用 OutF)，dt 截短使步恰好落在输出时刻；
+        // 文件编号 = 名义步数 k·OutProf (= t / dt(case))，不同网格 / 自适应 dt 的算例输出时刻与文件名一致
+        const int outStep = (Const::outProf > 0) ? Const::outProf : Const::outF;
+        const double Tp = (outStep > 0) ? outStep * world.getDt() : 0.;
+        long kOut = 0;
         world.setTime(0., std::numeric_limits<int>::max()); // 时间 = 已完成各步 dt 之和
         while (world.advanceNextStep() && world.getPhysicalTime() < tEnd)
         {
             double dt = Const::cfl / kobraRate(species, solver, world.getTs() == 0);
+            bool outNow = false;
+            if (Tp > 0.)
+            {
+                double tNext = kOut * Tp, tNow = world.getPhysicalTime();
+                outNow = (tNow >= tNext - 1e-9 * Tp);
+                if (outNow)
+                    tNext = (++kOut) * Tp;
+                if (tNow + dt > tNext - 1e-9 * Tp)
+                    dt = std::max(tNext - tNow, 1e-6 * dt);
+            }
             World::setDt(dt);
             solver.setDt(dt);
 
@@ -163,7 +175,8 @@ int main(int argc, char *argv[])
 
             solver.solve();
             spike.check(world.getTs());
-            vpd.step(world.getTs(), tauNow());
+            if (outNow)
+                vpd.step((int)((kOut - 1) * outStep), tauNow());
 
             for (int half = 0; half < 2; ++half)
             {
