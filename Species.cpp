@@ -78,9 +78,8 @@ double Species::getNumdensity()
 {
     // 贴壁网格 (右壁, i = ni-1) 的密度
     double den = 0;
-    double dv = world.getDv();
     for (int j = 0; j < world.nj; j++)
-        den += F(world.ni - 1, j) * dv;
+        den += F(world.ni - 1, j) * world.Dv(j);
     return den;
 }
 
@@ -101,7 +100,7 @@ double Species::gettotalKE()
         for (int j = 0; j < M; j++)
         {
             double v = world.V(j);
-            val += 0.5 * mass * F(i, j) * v * v * world.Dx(i) * dv;
+            val += 0.5 * mass * F(i, j) * v * v * world.Dx(i) * world.Dv(j);
             // val_t1 += 0.5 * 0.25 * (f[i][j] + f[i][j + 1] + f[i + 1][j] + f[i + 1][j + 1]) * dx * dv;
         }
 
@@ -128,11 +127,11 @@ double Species::gettotalnumber()
     {
         double row = 0;
         for (int j = 0; j < world.nj; j++)
-            row += F(i, j);
+            row += world.isVNonuniform() ? F(i, j) * world.Dv(j) : F(i, j);
         val += row * world.Dx(i);
     }
 
-    return val * world.getDv(); // 归一化系数：(n_elm*L_par)
+    return world.isVNonuniform() ? val : val * world.getDv(); // 归一化系数：(n_elm*L_par)；均匀 v 时保持原求和顺序
 }
 
 // 边界设置

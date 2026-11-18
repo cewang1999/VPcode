@@ -60,8 +60,11 @@ def from_vpcode(run_dir):
     lam = 1e-3
     case_dir = os.path.join(run_dir, "case")
     if os.path.isdir(case_dir):
-        for fn in os.listdir(case_dir):
-            for line in open(os.path.join(case_dir, fn)):
+        for fn in sorted(os.listdir(case_dir)):
+            path = os.path.join(case_dir, fn)
+            if not (fn.startswith("Case") and fn.endswith(".dat") and os.path.isfile(path)):
+                continue  # 只读 case 文件 (case/ 下还可能有 vfaces/ 等目录)
+            for line in open(path):
                 item = line.split()
                 if len(item) >= 2 and item[0] == "lambda":
                     lam = float(item[1])

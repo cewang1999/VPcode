@@ -23,7 +23,7 @@ import sys
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from vpio import Run, moments  # noqa: E402
+from vpio import Run, moments, rebin_v, v_edges  # noqa: E402
 
 import matplotlib  # noqa: E402
 
@@ -82,8 +82,7 @@ def phase(run, s, sp, side):
         F = {"right": right, "left": left, "avg": 0.5 * (left + right)}[side]
         xlab = "distance from wall [λ]"
         vlab = vlab.replace("v [", "v (toward wall +) [")
-    dv = v[1] - v[0]
-    ve = np.concatenate([v - 0.5 * dv, [v[-1] + 0.5 * dv]])
+    ve = v_edges(s, sp) * (np.sqrt(m) if sp == "i" else 1.0)  # 非均匀 v 网格时为真实格面
     return X, v, ve, F, xlab, vlab
 
 
@@ -261,7 +260,7 @@ def cmd_slice(args):
                     lab += f", d={dc[i]:.3g}λ"
                 ax.plot(v, fv, color=color, ls=ls, label=lab)
                 if args.maxw:
-                    n, u, T, _ = moments(fv, v, 1.0)  # v 已归一到本粒子热速度, 质量取 1
+                    n, u, T, _ = moments(fv, v, 1.0, dv=np.diff(ve))  # v 已归一到本粒子热速度, 质量取 1
                     if n > 0 and T > 0:
                         ax.plot(v, n / np.sqrt(2 * np.pi * T) * np.exp(-(v - u) ** 2 / (2 * T)),
                                 color=GRAY, lw=0.9, ls=(0, (3, 2)))
@@ -330,7 +329,9 @@ def cmd_diff(args):
     fig, axs = plt.subplots(1, len(sps), figsize=(5.0 * len(sps), 3.8), squeeze=False, constrained_layout=True)
     for c, sp in enumerate(sps):
         X, v, ve, F, xlab, vlab = phase(run, s, sp, args.side)
-        X0, _, _, F0, _, _ = phase(ref, s0, sp, args.side)
+        X0, _, ve0, F0, _, _ = phase(ref, s0, sp, args.side)
+        if F.shape[1] != F0.shape[1] or np.abs(ve - ve0).max() > 1e-9:
+            F0 = rebin_v(F0, ve0, ve)  # 速度网格不同：REF 守恒地平均到 TEST 的速度格上
         if F.shape != F0.shape:
             sys.exit(f"网格不同: {F.shape} vs {F0.shape}")
         X, D = crop(X, F - F0, args)
@@ -375,14 +376,14 @@ def cmd_wall(args):
         t = float(s["t"])
         k0 = int(np.argmin(np.abs(ref.snap_t - t)))
         s0 = ref.snap(k0)
-        X, v, _, F, xlab, vlab = phase(run, s, sp, side)
-        X0, v0, _, F0, _, _ = phase(ref, s0, sp, side)
-        if len(v) != len(v0):
-            sys.exit(f"速度网格不同: {len(v)} vs {len(v0)}")
+        X, v, ve, F, xlab, vlab = phase(run, s, sp, side)
+        X0, v0, ve0, F0, _, _ = phase(ref, s0, sp, side)
         i = int(np.argmin(np.abs(0.5 * (X[1:] + X[:-1]) - d)))
         a, b = X[i], X[i + 1]
         fT, fR = F[i], cell_avg(X0, F0, a, b)
-        mT, mR = moments(fT, v, 1.0), moments(fR, v, 1.0)
+        if len(v) != len(v0) or np.abs(ve - ve0).max() > 1e-9:
+            fR = rebin_v(fR, ve0, ve)  # 速度网格不同：REF 守恒地平均到 TEST 的速度格上
+        mT, mR = moments(fT, v, 1.0, dv=np.diff(ve)), moments(fR, v, 1.0, dv=np.diff(ve))
         ax = fig.add_subplot(gs[2 * r, c])
         ax.plot(v, fR, color=cR, lw=1.8, label=f"{rname(ref)} (avg over cell)")
         ax.plot(v, fT, color=cT, lw=1.1, ls=(0, (4, 2)), label=rname(run))

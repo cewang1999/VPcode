@@ -93,8 +93,8 @@ private:
         {
             rho.val(i) = 0;
             for (auto &sp : species)
-                for (int j = 0; j < nj; ++j)
-                    rho.val(i) += sp.F(i, j) * sp.charge * sp.getWorld().getDv();
+                for (int j = 0; j < sp.getWorld().nj; ++j)
+                    rho.val(i) += sp.F(i, j) * sp.charge * sp.getWorld().Dv(j);
         }
     }
     void computeNu()
@@ -105,10 +105,10 @@ private:
         {
             nu.val(i) = 0;
             for (auto &sp : species)
-                for (int j = -nghosts; j < nj + nghosts; ++j)
+                for (int j = -nghosts; j < sp.getWorld().nj + nghosts; ++j)
                 {
                     double v = sp.getWorld().V(j);
-                    nu.val(i) += sp.F(i, j) * sp.charge * v * sp.getWorld().getDv();
+                    nu.val(i) += sp.F(i, j) * sp.charge * v * sp.getWorld().Dv(j);
                 }
         }
     }
@@ -120,10 +120,10 @@ private:
         {
             nuu.val(i) = 0;
             for (auto &sp : species)
-                for (int j = -nghosts; j < nj + nghosts; ++j)
+                for (int j = -nghosts; j < sp.getWorld().nj + nghosts; ++j)
                 {
                     double v = sp.getWorld().V(j);
-                    nuu.val(i) += sp.F(i, j) * sp.charge * v * v * sp.getWorld().getDv();
+                    nuu.val(i) += sp.F(i, j) * sp.charge * v * v * sp.getWorld().Dv(j);
                 }
         }
     }
@@ -135,8 +135,8 @@ private:
         {
             ntol.val(i) = 0.;
             for (auto &sp : species)
-                for (int j = -nghosts; j < nj + nghosts; ++j)
-                    ntol.val(i) += sp.F(i, j) / sp.mass * sp.getWorld().getDv();
+                for (int j = -nghosts; j < sp.getWorld().nj + nghosts; ++j)
+                    ntol.val(i) += sp.F(i, j) / sp.mass * sp.getWorld().Dv(j);
         }
     }
     void computeMoments()
@@ -227,9 +227,9 @@ private:
         for (auto &sp : species)
         {
             World &w = sp.getWorld();
-            double dvv = w.getDv();
             for (int j = 0; j < w.nj; ++j)
             {
+                double dvv = w.Dv(j);
                 double v = w.V(j);
                 bool out = (s == 0) ? (v < 0) : (v > 0);
                 double f0 = sp.F(i, j), f1 = sp.F(nx, j);
@@ -281,9 +281,9 @@ private:
         for (auto &sp : species)
         {
             World &ws = sp.getWorld();
-            double dvv = ws.getDv();
             for (int j = 0; j < ws.nj; ++j)
             {
+                double dvv = ws.Dv(j);
                 double v = ws.V(j);
                 bool out = (s == 0) ? (v < 0) : (v > 0);
                 double f0 = sp.F(i, j), f1 = sp.F(nx, j);

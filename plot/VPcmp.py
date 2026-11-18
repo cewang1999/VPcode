@@ -26,7 +26,7 @@ import sys
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from vpio import Run  # noqa: E402
+from vpio import Run, rebin_v, v_edges  # noqa: E402
 
 import matplotlib  # noqa: E402
 
@@ -100,11 +100,13 @@ def regions(src):
     return [(f"0–{w:g}λ", 0, w), (f"{w:g}–{b2:g}λ", w, b2), (f"{b2:g}–200λ", b2, 200), ("200λ–center", 200, 1e9)]
 
 
-def errors(a, b, name, dist, regs):
-    """各区域的最大偏差。"""
+def errors(a, b, name, dist, regs, valid=None):
+    """各区域的最大偏差；valid 为参照有等离子体的格 (等离子体未到达处的 n、T、u 只是下限量级的噪声，不计)。"""
     out = []
     for _, lo, hi in regs:
         m = (dist >= lo) & (dist < hi)
+        if valid is not None:
+            m &= valid
         if not m.any():
             out.append(np.nan)
             continue
@@ -162,10 +164,16 @@ def main():
         if names is None:
             names = [n for n in POS + SGN if n in dt_ and n in rr]
         times.append(test.t[k])
+        valid = {}
+        for sp in ("e", "i"):
+            if f"n_{sp}" in rr:
+                nb = test.fold(rr[f"n_{sp}"], f"n_{sp}", args.side)[1]
+                valid[sp] = nb > 1e-6 * np.nanmax(nb)
         for n in names:
             a = test.fold(np.asarray(dt_[n], float), n, args.side)[1]
             b = test.fold(rr[n], n, args.side)[1]
-            hist.setdefault(n, []).append(errors(a, b, n, dist, regs))
+            sp = n[-1] if n[-2:] in ("_e", "_i") else "e"
+            hist.setdefault(n, []).append(errors(a, b, n, dist, regs, valid.get(sp)))
     times = np.array(times)
     hist = {n: np.array(v) for n, v in hist.items()}
 
@@ -234,7 +242,9 @@ def main():
     for r, (rn, _, _) in enumerate(regs):
         ax = axs[0][r]
         for c, n in enumerate(names):
-            ax.plot(times, 100 * hist[n][:, r], color=CAT[c % len(CAT)], ls="-" if c < len(CAT) else "--", label=n)
+            y = 100 * hist[n][:, r]
+            y = np.where(np.isfinite(y) & (y > 0) & (y < 1e8), y, np.nan)  # 对数轴：去掉 0、非有限值与无意义的极大值
+            ax.plot(times, y, color=CAT[c % len(CAT)], ls="-" if c < len(CAT) else "--", label=n)
         ax.set_yscale("log")
         ax.set_title(rn)
         ax.set_xlabel("t [τi]")
@@ -264,17 +274,19 @@ def main():
             ft.append(st[k])
             for r_, sp in enumerate(sps):
                 va, vb = np.asarray(a_s[f"v_{sp}"]), np.asarray(b_s[f"v_{sp}"])
-                if va.shape != vb.shape or np.abs(va - vb).max() > 1e-9:
-                    sys.exit("速度网格不同，无法逐点比较 f")
+                ea, eb = v_edges(a_s, sp), v_edges(b_s, sp)
                 fa = np.asarray(a_s[f"f_{sp}"], float)
                 fb = R(np.asarray(b_s[f"f_{sp}"], float))
-                w = test.dx[:, None]
+                if va.shape != vb.shape or np.abs(ea - eb).max() > 1e-9:
+                    fb = rebin_v(fb, eb, ea)  # 速度网格不同：REF 守恒地平均到 TEST 的速度格上
+                w = test.dx[:, None] * np.diff(ea)[None, :]  # L1 按相空间格面积加权
                 dvc[sp] = va[1] - va[0]
                 e = []
                 for _, lo, hi in regs:
                     dd = (1 - np.abs(test.x)) / test.lam
                     m = (dd >= lo) & (dd < hi)
-                    e.append(np.sum(np.abs(fa[m] - fb[m]) * w[m]) / max(np.sum(np.abs(fb[m]) * w[m]), 1e-300))
+                    den = np.sum(np.abs(fb[m]) * w[m])
+                    e.append(np.sum(np.abs(fa[m] - fb[m]) * w[m]) / den if den > 0 else np.nan)
                 fl1[sp].append(e)
                 if jj in figsel:
                     c = figsel.index(jj)
@@ -283,9 +295,8 @@ def main():
                     F0 = 0.5 * (fb[-n:][::-1] + fb[:n][:, ::-1])
                     X = (1.0 - faces(test)[-n - 1:])[::-1] / test.lam
                     X[0] = 0.5 * X[1]
-                    vv = va * (np.sqrt(mass[sp]) if sp == "i" else 1.0)
-                    dv = vv[1] - vv[0]
-                    ve = np.concatenate([vv - 0.5 * dv, [vv[-1] + 0.5 * dv]])
+                    sc = np.sqrt(mass[sp]) if sp == "i" else 1.0
+                    vv, ve = va * sc, ea * sc
                     lim = np.abs(D).max() or 1.0
                     ax = axs[r_][c]
                     pc = ax.pcolormesh(X, ve, D.T, cmap=DIV, norm=TwoSlopeNorm(0, -lim, lim), shading="flat", rasterized=True)
@@ -315,10 +326,12 @@ def main():
                 lines.append(f"{t:6.3g} {sp:>4} " + " ".join(f"{100 * e:13.3g}%" for e in arr[j]))
         fig, axs = plt.subplots(1, len(sps), figsize=(4.2 * len(sps), 3.2), squeeze=False, sharey=True)
         for r_, sp in enumerate(sps):
-            arr = np.array(fl1[sp])
+            arr = np.array(fl1[sp], dtype=float)
+            arr = np.where(np.isfinite(arr) & (arr > 0), arr, np.nan)  # 对数轴：去掉 0 与非有限值
             for c, (rn, _, _) in enumerate(regs):
                 axs[0][r_].plot(ft, 100 * arr[:, c], color=CAT[c], marker="o", ms=3, label=rn)
-            axs[0][r_].set_yscale("log")
+            if np.isfinite(arr).any():
+                axs[0][r_].set_yscale("log")
             axs[0][r_].set_title(f"f_{sp}: L1 relative error")
             axs[0][r_].set_xlabel("t [τi]")
         axs[0][0].set_ylabel("[%]")

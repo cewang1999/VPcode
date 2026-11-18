@@ -104,7 +104,7 @@ void ShiftX::advectionKobra()
             double val = sp.F(i, j) - dt * (flux[i + 1][j] - flux[i][j]) / hx;
             if (val < fl)
             {
-                (val < 0. ? neg : small) += (fl - val) * hx * dv; // 记录被抬到下限所加的质量
+                (val < 0. ? neg : small) += (fl - val) * hx * world.Dv(j); // 记录被抬到下限所加的质量
                 val = fl;
             }
             sp.F(i, j) = val;
@@ -119,7 +119,6 @@ void ShiftX::stepDiagKobra()
     // Scheme kobra 每个 x 子步之后调用 (Flux MUSCL 或 PFC3 均可)：累计壁面面通量 (输出时取时间平均)；
     // 贴壁格出射值 × v 与壁面 n、T 取推进后的 f (Strang 第二个 x 半步之后即一步结束，同 kobra 在每步结束后采样)
     int _ni = world.ni, _nj = world.nj;
-    double dv = world.getDv();
     sp.fluxAcc += sp.wallFlux * dt;
     sp.energyAcc += sp.wallEnergyFlux * dt;
     sp.timeAcc += dt;
@@ -129,7 +128,7 @@ void ShiftX::stepDiagKobra()
         double n = 0., g = 0., p = 0.;
         for (int j = 0; j < _nj; ++j)
         {
-            double v = world.V(j);
+            double v = world.V(j), dv = world.Dv(j);
             if ((side == 0 && v < 0) || (side == 1 && v > 0))
             {
                 double f = sp.F(side == 0 ? 0 : _ni - 1, j);
@@ -355,7 +354,7 @@ void ShiftX::updateInteriorCells()
             double val = sp.F(i, j) - dt * div_x;
             if (val < 1e-10)
             {
-                (val < 0. ? neg : small) += fabs(val) * hx * dv; // 记录截断量
+                (val < 0. ? neg : small) += fabs(val) * hx * world.Dv(j); // 记录截断量
                 val = 0.;
             }
             sp.F(i, j) = val;
@@ -367,11 +366,10 @@ void ShiftX::updateInteriorCells()
 void ShiftX::computeWallFlux()
 {
     // 壁面面通量即真实流出量（净通量，含被鞘层反射回去的部分）；取左右两壁平均
-    double dv = world.getDv();
     double gamma = 0., q = 0., cell = 0.;
     for (int j = 0; j < nj; ++j)
     {
-        double v = world.V(j);
+        double v = world.V(j), dv = world.Dv(j);
         double out = 0.5 * (flux[ni - 1][j] - flux[0][j]) * dv;
         gamma += out;
         q += out * (0.5 * sp.mass * v * v + 1.); // Q_par + Q_perp(=Γ T_ELM)
@@ -393,7 +391,7 @@ void ShiftX::computeWallFlux()
         double n = 0., g = 0., p = 0.;
         for (int j = 0; j < nj; ++j)
         {
-            double v = world.V(j);
+            double v = world.V(j), dv = world.Dv(j);
             double out = (side == 0) ? -flux[0][j] : flux[ni - 1][j]; // 流出为正
             if ((side == 0 && v < 0) || (side == 1 && v > 0))
             {
@@ -561,6 +559,59 @@ void ShiftV::advectRow(int i, double dtl, double &neg, double &small)
     fillGhostRow(i);
 }
 
+void ShiftV::advectRowNU(int i, double dtl, double &neg, double &small)
+{
+    // 非均匀 v 网格上的守恒半拉格朗日 PFC3 (同 ShiftX::computeFluxNU)：面 j 在 dtl 内的通量
+    //   = 出发点 V = VF(j) - a dtl 到面之间的质量 / dtl，出发点可越过任意多格；格内部分积分用非均匀抛物线 + PFC3 斜率修正
+    int _nj = world.nj;
+    double dx = world.Dx(i);
+    double a = sp.charge * getElectricField(i) / sp.mass;
+    double fmax = -1e100;
+    for (int j = 0; j < _nj; ++j)
+        fmax = std::max(fmax, sp.F(i, j));
+    fillGhostRow(i);
+    std::vector<double> Fl(_nj + 1, 0.);
+    if (fabs(a) > 1e-30)
+    {
+        bool right = (a > 0);
+        for (int j = 0; j <= _nj; ++j)
+        {
+            double X = std::min(std::max(world.VF(j) - dtl * a, world.VF(-1)), world.VF(_nj + 1));
+            int c = world.findCellV(X);
+            double mass = 0., len;
+            if (right)
+            {
+                c = std::max(std::min(c, j - 1), -1); // 出发点不能落到面上侧 (舍入)
+                for (int k = c + 1; k <= j - 1; ++k)
+                    mass += sp.F(i, k) * world.Dv(k);
+                len = world.VF(c + 1) - X;
+            }
+            else
+            {
+                c = std::min(std::max(c, j), _nj);
+                for (int k = j; k <= c - 1; ++k)
+                    mass += sp.F(i, k) * world.Dv(k);
+                len = X - world.VF(c);
+            }
+            len = std::min(std::max(len, 0.), world.Dv(c));
+            double part = len * pfcPartialAvg(sp.F(i, c - 1), sp.F(i, c), sp.F(i, c + 1),
+                                              world.Dv(c - 1), world.Dv(c), world.Dv(c + 1), len, right, fmax);
+            Fl[j] = (right ? 1. : -1.) * (part + mass) / dtl;
+        }
+    }
+    for (int j = 0; j < _nj; ++j)
+    {
+        double val = sp.F(i, j) - dtl * (Fl[j + 1] - Fl[j]) / world.Dv(j);
+        if (val < 1e-10)
+        {
+            (val < 0. ? neg : small) += fabs(val) * dx * world.Dv(j); // 记录截断量
+            val = 0.;
+        }
+        sp.F(i, j) = val;
+    }
+    fillGhostRow(i);
+}
+
 void ShiftV::advection()
 {
     // 各行互相独立；VCFL > 0 时按本行加速度子循环，使每个子步 |a| dt_sub < VCFL * dv（同 kobra 的时间步限制）
@@ -576,7 +627,7 @@ void ShiftV::advection()
             nsub = std::max(1, (int)std::ceil(a * dt / (Const::vcfl * dv)));
         }
         for (int k = 0; k < nsub; ++k)
-            advectRow(i, dt / nsub, neg, small);
+            world.isVNonuniform() ? advectRowNU(i, dt / nsub, neg, small) : advectRow(i, dt / nsub, neg, small);
     }
     sp.clipNeg += neg;
     sp.clipSmall += small;

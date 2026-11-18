@@ -260,14 +260,16 @@ static vector<pair<string, string>> commonMeta(World &world, vector<Species> &sp
         {"lambda", str(Const::lamda)},
         {"tau_i_code", str(sqrt(Const::m_H))},
         {"units", "x:L(域[-1,1]) v:v_Te t:tau_i(=sqrt(m_i/m_e)L/v_Te) phi:T/e E:T/(eL) f:n0/v_Te n:n0 u:v_Te T:T0 q:n0*T0*v_Te"},
-        {"layout", "C序; f[ix][iv]; x_face 为 nx+1 个网格面, x 为格中心, dx 为格宽; v_<sp> 为速度格中心 (均匀, 间距 dv_<sp>)"},
+        {"layout", "C序; f[ix][iv]; x_face 为 nx+1 个网格面, x 为格中心, dx 为格宽; v_<sp> 为速度格中心 (nv_<sp> 个；均匀时间距 dv_<sp>，非均匀时格面为 vf_<sp>)"},
         {"species", species.size() > 1 ? "e i" : "e"}};
     for (size_t s = 0; s < species.size(); s++)
     {
         string sp = (s == 0) ? "e" : "i";
         m.push_back({"mass_" + sp, str(species[s].mass)});
         m.push_back({"charge_" + sp, str(species[s].charge)});
-        m.push_back({"dv_" + sp, str(species[s].getWorld().getDv())});
+        m.push_back({"dv_" + sp, str(species[s].getWorld().getDv())}); // 非均匀 v 时为最小格宽，格面见 vf_<sp>
+        m.push_back({"nv_" + sp, to_string(species[s].getWorld().nj)});
+        m.push_back({"vgrid_" + sp, species[s].getWorld().isVNonuniform() ? "nonuniform" : "uniform"});
         m.push_back({"name_" + sp, species[s].name});
     }
     return m;
@@ -275,12 +277,16 @@ static vector<pair<string, string>> commonMeta(World &world, vector<Species> &sp
 
 static void commonFix(vector<VarSpec> &vars, World &world, vector<Species> &species)
 {
-    long nx = world.ni, nv = world.nj;
+    long nx = world.ni;
     vars.push_back({"x_face", "f8", {nx + 1}, false});
     vars.push_back({"x", "f8", {nx}, false});
     vars.push_back({"dx", "f8", {nx}, false});
     for (size_t s = 0; s < species.size(); s++)
-        vars.push_back({string("v_") + (s == 0 ? "e" : "i"), "f8", {nv}, false});
+        vars.push_back({string("v_") + (s == 0 ? "e" : "i"), "f8", {(long)species[s].getWorld().nj}, false});
+    // 非均匀 v 网格：另写速度格面 vf_<sp> (nv+1)；均匀时不写 (文件与原格式相同)
+    for (size_t s = 0; s < species.size(); s++)
+        if (species[s].getWorld().isVNonuniform())
+            vars.push_back({string("vf_") + (s == 0 ? "e" : "i"), "f8", {(long)species[s].getWorld().nj + 1}, false});
 }
 
 static void writeCommonFix(ofstream &out, World &world, vector<Species> &species)
@@ -304,6 +310,16 @@ static void writeCommonFix(ofstream &out, World &world, vector<Species> &species
         for (int j = 0; j < w.nj; j++)
             v[j] = w.V(j);
         putF8(out, v);
+    }
+    for (Species &sp : species)
+    {
+        World &w = sp.getWorld();
+        if (!w.isVNonuniform())
+            continue;
+        vector<double> vf(w.nj + 1);
+        for (int j = 0; j <= w.nj; j++)
+            vf[j] = w.VF(j);
+        putF8(out, vf);
     }
 }
 
@@ -331,7 +347,7 @@ void OUTPUT::VPDWriter::writeSnapshot(int ts, double tTau)
         cerr << "Could not open output file " << fn.str() << endl;
         return;
     }
-    long nx = world.ni, nv = world.nj;
+    long nx = world.ni;
     string fdt = (Const::outPrec == 4) ? "f4" : "f8";
     vector<VarSpec> vars;
     commonFix(vars, world, species);
@@ -340,7 +356,7 @@ void OUTPUT::VPDWriter::writeSnapshot(int ts, double tTau)
     for (const char *nm : {"phi", "E", "rho"})
         vars.push_back({nm, "f8", {nx}, true});
     for (size_t s = 0; s < species.size(); s++)
-        vars.push_back({string("f_") + (s == 0 ? "e" : "i"), fdt, {nx, nv}, true});
+        vars.push_back({string("f_") + (s == 0 ? "e" : "i"), fdt, {nx, (long)species[s].getWorld().nj}, true});
     auto meta = commonMeta(world, species);
     meta.push_back({"note", "f 为 f^n (t = ts*dt)；phi/E/rho 由同一 f^n 求得 (推进 f^n→f^{n+1} 所用的场)"});
     out << vpdHeader("snapshot", meta, vars);
@@ -413,6 +429,22 @@ void OUTPUT::VPDWriter::appendProfile(int ts, double tTau)
         for (int i = 0; i < nx; i++)
         {
             double s0 = 0., s1 = 0.;
+            if (w.isVNonuniform())
+            {
+                // 非均匀 v：逐格乘格宽
+                for (int j = 0; j < nv; j++)
+                    s0 += sp.F(i, j) * w.Dv(j), s1 += sp.F(i, j) * w.V(j) * w.Dv(j);
+                double ui = (s0 > 0.) ? s1 / s0 : 0., s2 = 0., s3 = 0.;
+                for (int j = 0; j < nv; j++)
+                {
+                    double c = w.V(j) - ui;
+                    s2 += sp.F(i, j) * c * c * w.Dv(j), s3 += sp.F(i, j) * c * c * c * w.Dv(j);
+                }
+                n[i] = s0, u[i] = ui;
+                T[i] = (s0 > 0.) ? m * s2 / s0 : 0.;
+                q[i] = 0.5 * m * s3;
+                continue;
+            }
             for (int j = 0; j < nv; j++)
                 s0 += sp.F(i, j), s1 += sp.F(i, j) * w.V(j);
             s0 *= dv, s1 *= dv;

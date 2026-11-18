@@ -66,10 +66,43 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    World world(Nx, Nv);
+    // 非均匀 v 网格 (VFacesE / VFacesI)：格面表以本粒子热速度为单位 (同 kobra 的 U)，离子乘 1/√(m_i/m_e) 换成 v_Te；
+    // 该粒子的 Nv 由表给出 (case 中的 Nv、Umax 只用于均匀的那一种)
+    dvector vfE, vfI;
+    if (!Const::vFacesE.empty())
+        vfE = Const::loadVFaces(Const::vFacesE);
+    if (!Const::vFacesI.empty())
+    {
+        vfI = Const::loadVFaces(Const::vFacesI);
+        for (double &a : vfI) // VScaleI > 1: 离子分布压缩到 U 的中心细格区 (同 kobra 的 vscale)
+            a *= Const::vScaleI / sqrt(Const::m_H);
+    }
+    if ((!vfE.empty() || !vfI.empty()) && Const::scheme == "kobra")
+    {
+        cerr << "VFacesE / VFacesI 目前只支持 Scheme PFC3" << endl;
+        return 1;
+    }
+    const int NvE = vfE.empty() ? Nv : (int)vfE.size() - 1;
+    const int NvI = vfI.empty() ? Nv : (int)vfI.size() - 1;
+
+    World world(Nx, NvE);
     world.setExtents(-1., 1., -ve, ve);
-    World world_D(Nx, Nv);
+    World world_D(Nx, NvI);
     world_D.setExtents(-1., 1., -vi, vi);
+    for (auto pr : {std::make_pair(&world, &vfE), std::make_pair(&world_D, &vfI)})
+    {
+        if (pr.second->empty())
+            continue;
+        pr.first->setVFaces(*pr.second);
+        World &w = *pr.first;
+        double sc = (pr.first == &world) ? 1. : sqrt(Const::m_H); // 换回热速度单位输出 (离子为 v_Ti，含 VScaleI)
+        double hmax = 0.;
+        for (int j = 0; j < w.nj; ++j)
+            hmax = std::max(hmax, w.Dv(j));
+        cout << "VFaces " << ((pr.first == &world) ? "e" : "i") << ": Nv = " << w.nj << ", ±" << w.getVmax() * sc
+             << ", dv " << w.getDv() * sc << " – " << hmax * sc << " (热速度单位)"
+             << ((pr.first == &world_D && Const::vScaleI != 1.) ? ", VScaleI " + to_string(Const::vScaleI) : string()) << endl;
+    }
     if (stretchX)
     {
         world.setXFaces(xfaces);
@@ -111,7 +144,7 @@ int main(int argc, char *argv[])
 
     {
         double cflx = world.getVmax() * world.getDt() / world.getDx();
-        cout << "Case" << Case << ": Nx=" << Nx << " Nv=" << Nv << " dt=" << world.getDt()
+        cout << "Case" << Case << ": Nx=" << Nx << " Nv=" << NvE << "/" << NvI << " dt=" << world.getDt()
              << " lambda=" << Const::lamda << " WallFace=" << Const::wallFace << " WallE=" << Const::wallE << " WallMoment=" << Const::wallMoment << " EFilter=" << Const::eFilter << " SpikeDump=" << Const::spikeDump << " VCFL=" << Const::vcfl
              << " Scheme=" << Const::scheme << " v: e ±" << ve << ", i ±" << vi
              << " | electron x-CFL(v_max, 最小格)=" << cflx << endl;

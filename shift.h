@@ -167,6 +167,7 @@ protected:
 
     void fillGhostRow(int i);                      // 填充第 i 行 V 方向幽灵网格 (Neumann)
     void advectRow(int i, double dtl, double &neg, double &small); // 第 i 行推进 dtl，累加截断量
+    void advectRowNU(int i, double dtl, double &neg, double &small); // 非均匀 v 网格：守恒半拉格朗日 PFC3 (可跨越多格)
     void computeFlux(int i, int j, double dtl);    // 计算 (i,j) 处 Flux
 
     // double getElectricField(int i) { return world.X(i); } // 委托给solver

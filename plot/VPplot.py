@@ -20,7 +20,7 @@ import sys
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from vpio import Run, moments  # noqa: E402
+from vpio import Run, dv_of, moments, v_edges  # noqa: E402
 
 import matplotlib  # noqa: E402
 
@@ -100,7 +100,8 @@ class Source:
             for sp in ("e", "i"):
                 if f"f_{sp}" in s:
                     m = s.meta.get(f"mass_{sp}", 1.0 if sp == "e" else 1836.0)
-                    for q, a in zip("nuTq", moments(np.asarray(s[f"f_{sp}"], float), np.asarray(s[f"v_{sp}"]), m)):
+                    for q, a in zip("nuTq", moments(np.asarray(s[f"f_{sp}"], float), np.asarray(s[f"v_{sp}"]), m,
+                                                    dv=dv_of(s, sp))):
                         d[f"{q}_{sp}"] = a
         return d
 
@@ -275,8 +276,7 @@ def cmd_f(args):
     xf = np.asarray(s["x_face"]) if "x_face" in s else None
     if xf is None:
         xf = np.concatenate([[x[0] - 0.5 * (x[1] - x[0])], 0.5 * (x[1:] + x[:-1]), [x[-1] + 0.5 * (x[-1] - x[-2])]])
-    dv = v[1] - v[0]
-    ve = np.concatenate([v - 0.5 * dv, [v[-1] + 0.5 * dv]])
+    ve = v_edges(s, args.sp)  # 非均匀 v 网格时为真实格面 (速度网格关于 0 对称，翻转 v 时格面不变)
     fig, ax = plt.subplots(figsize=(6.4, 4.2))
     if args.side == "full":
         X, F = xf, f

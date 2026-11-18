@@ -72,6 +72,9 @@ namespace Const
 	extern std::string caseNo;	  // case 编号 (写入输出文件头)
 	std::vector<double> buildStretchedFaces(); // stretch 网格的网格面坐标 (-1 … 1)
 	std::vector<double> buildRefinedFaces();   // refine 网格: 均匀粗网格 (DxBulk)，每侧壁面 NRefine 个粗格各等分为 DxBulk/DxWall 个细格
+	extern std::string vFacesE, vFacesI;	   // 非均匀 v 网格: 格面表文件 (以本粒子热速度为单位, 同 kobra 的 U)；空 = 均匀 (Nv, Umax)
+	extern double vScaleI;					   // 离子格面表的速度缩放: v_i = VScaleI · U · v_Ti (同 kobra 中离子的 vscale 乘以 VScaleI)，缺省 1
+	std::vector<double> loadVFaces(const std::string &path); // 读格面表 (空白分隔的数, # 后为注释)，检查单调
 
 	void printMyself();
 	void readConst(string no);
@@ -125,7 +128,16 @@ public:
 		return std::min(std::max(k, -nghosts), ni + nghosts - 1);
 	}
 	void setXFaces(const dvector &faces); // 非均匀 x 网格：faces 为真实格的 ni+1 个网格面，幽灵格按壁面镜像
-	double getDv() const { return dv; }
+	double getDv() const { return dv; }	  // 均匀 v 网格的格宽；非均匀 v 网格时为最小格宽 (只用于 CFL 估计与输出)
+	bool isVNonuniform() const { return vnonuniform; }
+	inline double Dv(int j) const { return hv[vIdx(j)]; }  // 第 j 个速度格宽度 (含幽灵格)
+	inline double VF(int j) const { return vf[vIdx(j)]; }  // 第 j 个速度格的下侧格面 (j = -nghosts … nj+nghosts)
+	int findCellV(double V) const						   // VF(j) <= V < VF(j+1) 的格号 (含幽灵格)
+	{
+		int k = int(std::upper_bound(vf.begin(), vf.end(), V) - vf.begin()) - 1 - nghosts;
+		return std::min(std::max(k, -nghosts), nj + nghosts - 1);
+	}
+	void setVFaces(const dvector &faces); // 非均匀 v 网格：faces 为真实格的 nj+1 个格面 (物理速度)，幽灵格宽度按两端镜像
 	double getDt() const { return dt; }
 
 	/*Topo x:0 v:1 */
@@ -222,6 +234,9 @@ protected:
 	dvector xf;									   // x 网格面 (ni_total + 1)
 	dvector h;									   // x 格宽 (ni_total)
 	bool nonuniform = false;
+	dvector vf;									   // v 格面 (nj_total + 1)
+	dvector hv;									   // v 格宽 (nj_total)
+	bool vnonuniform = false;
 };
 
 #endif // !_WORLD_H

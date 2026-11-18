@@ -30,7 +30,15 @@ def read_diags(run_dir):
     with open(path) as fin:
         rows = list(csv.reader(fin))
     head = rows[0]
-    body = np.array([r for r in rows[1:] if len(r) == len(head)], dtype=float)
+    good = []
+    for r in rows[1:]:  # 算例运行中最后一行可能只写了一部分：字段数不对或数字不完整的行跳过
+        if len(r) != len(head):
+            continue
+        try:
+            good.append([float(x) for x in r])
+        except ValueError:
+            continue
+    body = np.array(good, dtype=float)
     return {name: body[:, k] for k, name in enumerate(head)}
 
 
@@ -40,15 +48,23 @@ def run_label(run_dir):
     par = {}
     case_dir = os.path.join(run_dir, "case")
     if os.path.isdir(case_dir):
-        for fn in os.listdir(case_dir):
-            for line in open(os.path.join(case_dir, fn)):
+        for fn in sorted(os.listdir(case_dir)):
+            path = os.path.join(case_dir, fn)
+            if not (fn.startswith("Case") and fn.endswith(".dat") and os.path.isfile(path)):
+                continue  # 只读 case 文件 (case/ 下还可能有 vfaces/ 等目录)
+            for line in open(path):
                 item = line.split()
                 if len(item) >= 2:
                     par[item[0]] = item[1]
     if not par:
         return name
+    nv = par.get('Nv')
+    if "VFacesE" in par or "VFacesI" in par:  # 非均匀 v 网格：Nv 由格面表给出
+        fe = os.path.splitext(os.path.basename(par.get("VFacesE", "")))[0] or f"u{nv}"
+        fi = os.path.splitext(os.path.basename(par.get("VFacesI", "")))[0] or f"u{nv}"
+        nv = fe if fe == fi else f"{fe}/{fi}"
     return (f"{name}: $\\lambda$={par.get('lambda', '1e-3')}, Nx={par.get('Nx')}, "
-            f"Nv={par.get('Nv')}, dt={par.get('dt')}")
+            f"Nv={nv}, dt={par.get('dt')}")
 
 
 def free_streaming(t, x=1.0, sigma=SIGMA):

@@ -1,0 +1,28 @@
+# Const number
+
+L           55
+n           3.2e19
+T           150
+sigma       10
+Nx          376
+Nv          1000
+theta       90
+SolverType  AP
+dt          0.0005
+num_ts      342800
+lambda      0.001
+WallFace    PFC3
+VCFL        0
+OutDiag     10
+OutF        17140
+OutProf     1714
+OutPrec     4
+WallE       kobra
+Scheme      kobra
+Umax        6
+Dfloor      1e-10
+CFL         0.9
+XGrid       refine
+DxWall      0.125
+DxBulk      8
+NRefine     1

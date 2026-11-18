@@ -42,6 +42,8 @@ namespace Const
 	double cfl = 0.9;
 	double umax = 0.;
 	string xgrid = "uniform";
+	string vFacesE = "", vFacesI = "";
+	double vScaleI = 1.;
 	double dxWall = 0.5;
 	double dxBulk = 16.;
 	double wallWidth = 50.;
@@ -118,6 +120,12 @@ void Const::readConst(string no)
 			record >> Const::cfl;
 		else if (param == "Umax")
 			record >> Const::umax;
+		else if (param == "VFacesE")
+			record >> Const::vFacesE;
+		else if (param == "VFacesI")
+			record >> Const::vFacesI;
+		else if (param == "VScaleI")
+			record >> Const::vScaleI;
 		else if (param == "XGrid")
 			record >> Const::xgrid;
 		else if (param == "DxWall")
@@ -293,11 +301,78 @@ void World::setExtents(const double _xmin, const double _xmax, const double _vmi
 	for (int i = -nghosts; i < nj + nghosts; i++)
 		V(i) = vmin + 0.5 * dv + i * dv;
 
+	/*均匀 v 网格的格面与格宽 (与非均匀网格共用接口)*/
+	vf.assign(nj_total + 1, 0.);
+	hv.assign(nj_total, dv);
+	for (int k = 0; k <= nj_total; k++)
+		vf[k] = vmin + (k - nghosts) * dv;
+
 	/*均匀 x 网格的网格面与格宽 (与非均匀网格共用接口)*/
 	xf.assign(ni_total + 1, 0.);
 	h.assign(ni_total, dx);
 	for (int k = 0; k <= ni_total; k++)
 		xf[k] = xmin + (k - nghosts) * dx;
+}
+
+void World::setVFaces(const dvector &faces)
+{
+	if ((int)faces.size() != nj + 1)
+	{
+		cerr << "setVFaces: faces.size() != nj + 1" << endl;
+		exit(1);
+	}
+	vnonuniform = true;
+	for (int j = 0; j < nj; j++)
+		hv[vIdx(j)] = faces[j + 1] - faces[j];
+	for (int k = 1; k <= nghosts; k++) // 幽灵格宽度按两端镜像 (Neumann 幽灵值也是镜像)
+	{
+		hv[vIdx(-k)] = hv[vIdx(k - 1)];
+		hv[vIdx(nj + k - 1)] = hv[vIdx(nj - k)];
+	}
+	vf[vIdx(0)] = faces[0];
+	for (int j = 0; j < nj + nghosts; j++)
+		vf[vIdx(j + 1)] = (j < nj) ? faces[j + 1] : vf[vIdx(j)] + hv[vIdx(j)];
+	for (int j = -1; j >= -nghosts; j--)
+		vf[vIdx(j)] = vf[vIdx(j + 1)] - hv[vIdx(j)];
+	for (int j = -nghosts; j < nj + nghosts; j++)
+		V(j) = 0.5 * (vf[vIdx(j)] + vf[vIdx(j + 1)]);
+	vmin = faces.front();
+	vmax = faces.back();
+	dv = *std::min_element(hv.begin() + nghosts, hv.end() - nghosts);
+}
+
+std::vector<double> Const::loadVFaces(const std::string &path)
+{
+	ifstream in(path);
+	if (!in)
+	{
+		cerr << "VFaces: 无法打开 " << path << endl;
+		exit(1);
+	}
+	std::vector<double> f;
+	string line;
+	while (getline(in, line))
+	{
+		size_t c = line.find('#');
+		if (c != string::npos)
+			line = line.substr(0, c);
+		istringstream rec(line);
+		double a;
+		while (rec >> a)
+			f.push_back(a);
+	}
+	if (f.size() < 3)
+	{
+		cerr << "VFaces: " << path << " 中格面少于 3 个" << endl;
+		exit(1);
+	}
+	for (size_t k = 1; k < f.size(); k++)
+		if (!(f[k] > f[k - 1]))
+		{
+			cerr << "VFaces: " << path << " 的格面不是严格递增 (第 " << k << " 个)" << endl;
+			exit(1);
+		}
+	return f;
 }
 
 void World::setXFaces(const dvector &faces)

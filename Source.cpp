@@ -57,12 +57,22 @@ void DeltaTimeSource::pulse(double t)
     double pw = sp.pw;
     double m = sp.mass;
 
+    // 非均匀 v 网格：取麦克斯韦分布在格内的精确平均 (erf)，使 Σ f Δv 与密度一致。
+    // 格中心点值在外侧宽格上的积分误差 (~1e-4) 会造成初始电荷不平衡，经 1/λ² 放大为很大的初始电势
+    const bool vnu = world.isVNonuniform();
     for (int i = 0; i < N; i++)
         for (int j = 0; j < M; j++)
         {
             double x = world.X(i);
             double v = world.V(j);
-            sp.F(i, j) = 1. * pw * sqrt(m) * exp(-0.5 * x * x / sigma / sigma) * exp(-0.5 * v * v * m) / sqrt(2.0 * PI);
+            if (vnu)
+            {
+                double c = sqrt(0.5 * m);
+                double avg = 0.5 * (erf(world.VF(j + 1) * c) - erf(world.VF(j) * c)) / world.Dv(j);
+                sp.F(i, j) = 1. * pw * exp(-0.5 * x * x / sigma / sigma) * avg;
+            }
+            else
+                sp.F(i, j) = 1. * pw * sqrt(m) * exp(-0.5 * x * x / sigma / sigma) * exp(-0.5 * v * v * m) / sqrt(2.0 * PI);
             if (Const::scheme == "kobra")
                 sp.F(i, j) = std::max(sp.F(i, j), sp.fFloor); // 同 kobra: 不截断, 只抬到下限
             else

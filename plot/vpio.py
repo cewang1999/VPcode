@@ -129,15 +129,51 @@ def read_vpd(path, **kw):
     return VPD(path, **kw)
 
 
-def moments(f, v, mass, axis=-1):
-    """由分布函数 f(..., v) 计算 n、u、T、q (同 out/prof.vpd 的定义，v 为均匀速度格中心)。"""
-    dv = v[1] - v[0]
-    n = f.sum(axis) * dv
-    u = (f * v).sum(axis) * dv / np.where(n > 0, n, 1)
+def moments(f, v, mass, axis=-1, dv=None):
+    """由分布函数 f(..., v) 计算 n、u、T、q (同 out/prof.vpd 的定义)。
+    v 为速度格中心；dv 为逐格格宽 (非均匀 v 网格，见 dv_of)，缺省按均匀网格取 v[1] - v[0]。"""
+    if dv is None:
+        dv = v[1] - v[0]
+        n = f.sum(axis) * dv
+        u = (f * v).sum(axis) * dv / np.where(n > 0, n, 1)
+        c = v - np.expand_dims(u, axis)
+        T = mass * (f * c**2).sum(axis) * dv / np.where(n > 0, n, 1)
+        q = 0.5 * mass * (f * c**3).sum(axis) * dv
+        return n, u, T, q
+    w = np.asarray(dv)
+    if axis not in (-1, f.ndim - 1):
+        raise ValueError("非均匀 dv 只支持速度在最后一维")
+    n = (f * w).sum(axis)
+    u = (f * v * w).sum(axis) / np.where(n > 0, n, 1)
     c = v - np.expand_dims(u, axis)
-    T = mass * (f * c**2).sum(axis) * dv / np.where(n > 0, n, 1)
-    q = 0.5 * mass * (f * c**3).sum(axis) * dv
+    T = mass * (f * c**2 * w).sum(axis) / np.where(n > 0, n, 1)
+    q = 0.5 * mass * (f * c**3 * w).sum(axis)
     return n, u, T, q
+
+
+def dv_of(d, sp):
+    """快照 / 剖面文件中粒子 sp 的速度格宽：非均匀 v 网格 (有 vf_<sp>) 时为逐格数组，否则为 None (按均匀处理)。"""
+    key = f"vf_{sp}"
+    return np.diff(np.asarray(d[key])) if key in d else None
+
+
+def rebin_v(f, e_from, e_to):
+    """把 f(..., v) 从速度格面 e_from 守恒地平均到格面 e_to 上 (按重叠长度加权；e_to 超出 e_from 的部分按 0 计)。"""
+    e_from, e_to = np.asarray(e_from), np.asarray(e_to)
+    lo = np.maximum(e_from[None, :-1], e_to[:-1, None])
+    hi = np.minimum(e_from[None, 1:], e_to[1:, None])
+    W = np.clip(hi - lo, 0.0, None) / np.diff(e_to)[:, None]  # (nv_to, nv_from)
+    return np.asarray(f) @ W.T
+
+
+def v_edges(d, sp):
+    """粒子 sp 的速度格面 (nv+1)：非均匀时为 vf_<sp>，均匀时由格中心推出。"""
+    key = f"vf_{sp}"
+    if key in d:
+        return np.asarray(d[key])
+    v = np.asarray(d[f"v_{sp}"])
+    h = v[1] - v[0]
+    return np.concatenate([v - 0.5 * h, [v[-1] + 0.5 * h]])
 
 
 def faces_from_case(case, x=None):
@@ -175,7 +211,16 @@ def read_diag(path):
     """读取 runtime_diags.csv 为 dict (列名 → 数组)；第 0 列 (时间, τi) 另存为 "t"。"""
     with open(path) as fh:
         names = fh.readline().strip().split(",")
-    a = np.loadtxt(path, delimiter=",", skiprows=1, ndmin=2)
+        rows = []
+        for ln in fh:  # 算例运行中最后一行可能只写了一部分：字段数不对或数字不完整的行跳过
+            parts = ln.strip().split(",")
+            if len(parts) != len(names):
+                continue
+            try:
+                rows.append([float(x) for x in parts])
+            except ValueError:
+                continue
+    a = np.array(rows, dtype=float).reshape(-1, len(names))
     d = {n: a[:, k] for k, n in enumerate(names)}
     d["t"] = a[:, 0]
     return d
@@ -190,12 +235,23 @@ class Run:
         self.path = path.rstrip("/")
         self.out = os.path.join(self.path, "out")
         self._prof = self._diag = None
-        self.snap_files = sorted(glob.glob(os.path.join(self.out, "f_*.vpd")))
+        self.snap_files = [f for f in sorted(glob.glob(os.path.join(self.out, "f_*.vpd"))) if self._complete(f)]
         self.legacy = not self.snap_files and bool(glob.glob(os.path.join(self.path, "results", "vlasov_*.txt")))
         cases = glob.glob(os.path.join(self.path, "case", "Case*.dat"))
         self.case = read_case(cases[0]) if cases else {}
         if self.legacy:
             self.snap_files = sorted(glob.glob(os.path.join(self.path, "results", "vlasov_*.txt")))
+
+    @staticmethod
+    def _complete(f):
+        """快照是否已写完 (算例运行中最后一个快照可能只写了一部分)。"""
+        try:
+            ok = VPD(f).nrec >= 1
+        except (ValueError, OSError):
+            ok = False
+        if not ok:
+            print(f"{f}: 快照不完整 (可能正在写入)，跳过")
+        return ok
 
     # ---- 剖面与诊断 ----
     @property
